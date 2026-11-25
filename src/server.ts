@@ -3,7 +3,6 @@ import cors from 'cors';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { db } from './db/database.ts';
-import { seedDatabase } from './db/seed.ts';
 import { calculateSplits, calculateEqualSplit } from './engine/splitCalculator.ts';
 import { analyzeGroupSettlement } from './engine/simplifyDebts.ts';
 import type { SplitType } from './models/types.ts';
@@ -18,22 +17,6 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(rootDir, 'public')));
-
-// Ensure database is initialized with initial seed data on first run / serverless cold-start
-let initialized = false;
-app.use((req, res, next) => {
-  if (!initialized) {
-    try {
-      if (db.getGroups().length === 0) {
-        seedDatabase();
-      }
-      initialized = true;
-    } catch (e) {
-      console.error('Error auto-seeding:', e);
-    }
-  }
-  next();
-});
 
 // Helper to look up user names for nice client responses
 function getUserMap() {
@@ -623,11 +606,11 @@ app.delete('/api/comments/:id', (req, res) => {
   }
 });
 
-// Reseed Endpoint
-app.post('/api/seed', (req, res) => {
+// Clear Data Endpoint
+app.post(['/api/clear-all-data', '/api/seed'], (req, res) => {
   try {
-    seedDatabase();
-    res.json({ success: true, message: 'Database reseeded with Goa Beach Trip scenario!' });
+    db.clearAllData();
+    res.json({ success: true, message: 'All data cleared successfully.' });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -635,11 +618,6 @@ app.post('/api/seed', (req, res) => {
 
 // Start Server
 if (process.argv[1]?.endsWith('server.ts')) {
-  if (db.getGroups().length === 0) {
-    console.log('Database is empty. Populating initial seed data...');
-    seedDatabase();
-  }
-
   app.listen(PORT, () => {
     console.log(`\n=================================================`);
     console.log(`🚀 Splitwise Server & UI running at http://localhost:${PORT}`);

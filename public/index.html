@@ -55,18 +55,6 @@
           </button>
           <button class="sw-btn-hero-cta" id="btnHeroSignup">Sign up with email</button>
         </div>
-
-        <!-- 1-Click Instant Demo Credentials -->
-        <div class="sw-demo-quick-bar">
-          <span class="sw-demo-bar-label">⚡ 1-CLICK INSTANT DEMO ACCOUNTS:</span>
-          <div class="sw-demo-pills">
-            <button class="sw-demo-pill" data-email="yash@example.com">👨‍💻 Yash</button>
-            <button class="sw-demo-pill" data-email="alice@example.com">👩‍🎨 Alice</button>
-            <button class="sw-demo-pill" data-email="bob@example.com">🏄‍♂️ Bob</button>
-            <button class="sw-demo-pill" data-email="charlie@example.com">🎸 Charlie</button>
-            <button class="sw-demo-pill" data-email="diana@example.com">📸 Diana</button>
-          </div>
-        </div>
       </div>
     </section>
 
@@ -139,9 +127,6 @@
             </button>
             <button class="sw-dropdown-item" id="btnOpenFriendModal">
               <span>🤝</span> Add a friend
-            </button>
-            <button class="sw-dropdown-item" id="btnReseedDemo">
-              <span>🔄</span> Reset demo data (Goa Trip)
             </button>
             <div class="sw-dropdown-divider"></div>
             <button class="sw-dropdown-item text-orange" id="btnLogout">
@@ -347,15 +332,6 @@
             <input type="password" id="loginPassword" class="sw-select-control" placeholder="••••••••" required>
           </div>
 
-          <div class="sw-auth-quick-select">
-            <span class="sw-field-label" style="display:block; margin-bottom:4px;">Quick demo login:</span>
-            <div class="sw-demo-pills">
-              <button type="button" class="sw-demo-pill" onclick="quickFillLogin('yash@example.com')">👨‍💻 Yash</button>
-              <button type="button" class="sw-demo-pill" onclick="quickFillLogin('alice@example.com')">👩‍🎨 Alice</button>
-              <button type="button" class="sw-demo-pill" onclick="quickFillLogin('bob@example.com')">🏄‍♂️ Bob</button>
-            </div>
-          </div>
-
           <div class="sw-modal-footer" style="justify-content: space-between; margin-top: 14px;">
             <a href="#" class="sw-auth-switch-link" id="linkSwitchToSignup">Don't have an account? Sign up</a>
             <button type="submit" class="sw-btn-save-teal">Log in</button>
@@ -443,32 +419,19 @@
       </div>
 
       <div class="sw-google-body">
-        <p class="sw-google-sub">Choose an account to continue to <strong>Splitwise</strong></p>
+        <p class="sw-google-sub">Sign in or sign up with your <strong>Google Account</strong> to continue to Splitwise</p>
 
-        <div class="sw-google-account-list">
-          <div class="sw-google-account-item" onclick="executeGoogleLogin('Yash Agarwal', 'yash240391@gmail.com', '👨‍💻')">
-            <div class="sw-google-avatar">👨‍💻</div>
-            <div class="sw-google-acc-info">
-              <span class="sw-google-acc-name">Yash Agarwal</span>
-              <span class="sw-google-acc-email">yash240391@gmail.com</span>
+        <div class="sw-google-custom-wrap" style="margin-top: 12px;">
+          <form onsubmit="handleCustomGoogleSubmit(event)" style="display:flex; flex-direction:column; gap:12px;">
+            <div class="sw-form-group" style="margin-bottom:0;">
+              <label class="sw-field-label">Full Name</label>
+              <input type="text" id="customGoogleName" class="sw-select-control" placeholder="e.g. Yash Agarwal" required>
             </div>
-          </div>
-
-          <div class="sw-google-account-item" onclick="executeGoogleLogin('Alice Smith', 'alice.smith@gmail.com', '👩‍🎨')">
-            <div class="sw-google-avatar">👩‍🎨</div>
-            <div class="sw-google-acc-info">
-              <span class="sw-google-acc-name">Alice Smith</span>
-              <span class="sw-google-acc-email">alice.smith@gmail.com</span>
+            <div class="sw-form-group" style="margin-bottom:0;">
+              <label class="sw-field-label">Google Email</label>
+              <input type="email" id="customGoogleEmail" class="sw-select-control" placeholder="name@gmail.com" required>
             </div>
-          </div>
-        </div>
-
-        <div class="sw-google-custom-wrap">
-          <span class="sw-field-label" style="display:block; margin-bottom:6px;">Or connect with another Google account:</span>
-          <form onsubmit="handleCustomGoogleSubmit(event)" style="display:flex; flex-direction:column; gap:8px;">
-            <input type="text" id="customGoogleName" class="sw-select-control" placeholder="Your Name" required>
-            <input type="email" id="customGoogleEmail" class="sw-select-control" placeholder="your.name@gmail.com" required>
-            <button type="submit" class="sw-btn-save-teal" style="width:100%;">Continue as Google User</button>
+            <button type="submit" class="sw-btn-save-teal" style="width:100%; margin-top: 4px; padding: 11px;">Continue with Google</button>
           </form>
         </div>
       </div>

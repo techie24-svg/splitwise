@@ -873,157 +873,6 @@ function analyzeGroupSettlement(expenses) {
   };
 }
 
-// src/db/seed.ts
-function seedDatabase() {
-  console.log("\u{1F331} Seeding Splitwise Database with Auth & Activity Stream...");
-  db.clearAllData();
-  const yash = db.createUser({ id: "u_yash", name: "Yash", email: "yash@example.com", avatarUrl: "\u{1F468}\u200D\u{1F4BB}", password: "password123", defaultCurrency: "INR" });
-  const alice = db.createUser({ id: "u_alice", name: "Alice", email: "alice@example.com", avatarUrl: "\u{1F469}\u200D\u{1F3A8}", password: "password123", defaultCurrency: "INR" });
-  const bob = db.createUser({ id: "u_bob", name: "Bob", email: "bob@example.com", avatarUrl: "\u{1F3C4}\u200D\u2642\uFE0F", password: "password123", defaultCurrency: "INR" });
-  const charlie = db.createUser({ id: "u_charlie", name: "Charlie", email: "charlie@example.com", avatarUrl: "\u{1F3B8}", password: "password123", defaultCurrency: "INR" });
-  const diana = db.createUser({ id: "u_diana", name: "Diana", email: "diana@example.com", avatarUrl: "\u{1F4F8}", password: "password123", defaultCurrency: "INR" });
-  const allUserIds = [yash.id, alice.id, bob.id, charlie.id, diana.id];
-  db.addFriend(yash.id, alice.id);
-  db.addFriend(yash.id, bob.id);
-  db.addFriend(yash.id, charlie.id);
-  db.addFriend(yash.id, diana.id);
-  db.addFriend(alice.id, bob.id);
-  db.addFriend(charlie.id, diana.id);
-  const trip = db.createGroup({
-    id: "grp_goa_trip",
-    name: "Goa Beach Trip \u{1F334}",
-    description: "Weekend getaway with villa, scuba diving & sunset dinner",
-    currency: "INR",
-    memberIds: allUserIds
-  });
-  db.logActivity({
-    userId: yash.id,
-    groupId: trip.id,
-    type: "group_created",
-    description: 'Yash created the group "Goa Beach Trip \u{1F334}"'
-  });
-  console.log(` Created group: "${trip.name}" with ${trip.members.length} members`);
-  db.createExpense({
-    groupId: trip.id,
-    description: "Luxury Beach Villa (3 nights)",
-    totalAmount: 15e3,
-    currency: "INR",
-    category: "Lodging",
-    payers: [{ userId: yash.id, amount: 15e3 }],
-    splitType: "EQUAL",
-    splits: calculateEqualSplit(15e3, allUserIds)
-  });
-  db.logActivity({
-    userId: yash.id,
-    groupId: trip.id,
-    type: "expense_created",
-    description: 'Yash added "Luxury Beach Villa (3 nights)" (\u20B915,000.00)'
-  });
-  db.createExpense({
-    groupId: trip.id,
-    description: "Fisherman\u2019s Wharf Seafood Dinner",
-    totalAmount: 5400,
-    currency: "INR",
-    category: "Food",
-    payers: [{ userId: alice.id, amount: 5400 }],
-    splitType: "EQUAL",
-    splits: calculateEqualSplit(5400, allUserIds)
-  });
-  db.logActivity({
-    userId: alice.id,
-    groupId: trip.id,
-    type: "expense_created",
-    description: 'Alice added "Fisherman\u2019s Wharf Seafood Dinner" (\u20B95,400.00)'
-  });
-  const scubaParticipants = [yash.id, bob.id, charlie.id];
-  db.createExpense({
-    groupId: trip.id,
-    description: "Scuba Diving & Snorkeling at Grand Island",
-    totalAmount: 9e3,
-    currency: "INR",
-    category: "Activities",
-    payers: [{ userId: bob.id, amount: 9e3 }],
-    splitType: "EQUAL",
-    splits: calculateEqualSplit(9e3, scubaParticipants)
-  });
-  db.logActivity({
-    userId: bob.id,
-    groupId: trip.id,
-    type: "expense_created",
-    description: 'Bob added "Scuba Diving & Snorkeling at Grand Island" (\u20B99,000.00)'
-  });
-  db.createExpense({
-    groupId: trip.id,
-    description: "Thar 4x4 Rental & Fuel",
-    totalAmount: 4e3,
-    currency: "INR",
-    category: "Transport",
-    payers: [{ userId: charlie.id, amount: 4e3 }],
-    splitType: "EQUAL",
-    splits: calculateEqualSplit(4e3, allUserIds)
-  });
-  db.logActivity({
-    userId: charlie.id,
-    groupId: trip.id,
-    type: "expense_created",
-    description: 'Charlie added "Thar 4x4 Rental & Fuel" (\u20B94,000.00)'
-  });
-  db.createExpense({
-    groupId: trip.id,
-    description: "Curlies Sunset Cocktails & Appetizers",
-    totalAmount: 2500,
-    currency: "INR",
-    category: "Drinks",
-    payers: [{ userId: diana.id, amount: 2500 }],
-    splitType: "EQUAL",
-    splits: calculateEqualSplit(2500, allUserIds)
-  });
-  db.logActivity({
-    userId: diana.id,
-    groupId: trip.id,
-    type: "expense_created",
-    description: 'Diana added "Curlies Sunset Cocktails & Appetizers" (\u20B92,500.00)'
-  });
-  const directExp = db.createExpense({
-    description: "Airport Prepaid Cab (Goa Airport to Villa)",
-    totalAmount: 1200,
-    currency: "INR",
-    category: "Transport",
-    payers: [{ userId: yash.id, amount: 1200 }],
-    splitType: "EQUAL",
-    splits: calculateEqualSplit(1200, [yash.id, alice.id])
-  });
-  db.logActivity({
-    userId: yash.id,
-    type: "expense_created",
-    description: 'Yash added 1:1 expense "Airport Prepaid Cab" with Alice (\u20B91,200.00)'
-  });
-  const allGroupExpenses = db.getGroupExpenses(trip.id);
-  const villaExp = allGroupExpenses.find((e) => e.description.includes("Villa"));
-  const dinnerExp = allGroupExpenses.find((e) => e.description.includes("Seafood"));
-  if (villaExp) {
-    db.addComment(villaExp.id, alice.id, "The ocean view from the terrace was breathtaking! \u{1F30A}");
-    db.addComment(villaExp.id, yash.id, "Totally worth it! Glad everyone loved the private pool.");
-  }
-  if (dinnerExp) {
-    db.addComment(dinnerExp.id, charlie.id, "Best butter garlic prawns in North Goa! \u{1F364}");
-  }
-  if (directExp) {
-    db.addComment(directExp.id, alice.id, "Thanks for booking the cab Yash, split added! \u{1F695}");
-  }
-  const expenses = db.getGroupExpenses(trip.id);
-  console.log(` Added ${expenses.length} expenses to "${trip.name}".`);
-  const summary = analyzeGroupSettlement(expenses);
-  console.log(` Settlement Stats:`);
-  console.log(`   - Unsimplified Transactions: ${summary.unsimplifiedDebts.length}`);
-  console.log(`   - Simplified Transactions:   ${summary.simplifiedDebts.length}`);
-  console.log(`   - Transaction Reduction:     ${summary.reductionPercentage}%`);
-  console.log(" Database seeded successfully!");
-}
-if (process.argv[1]?.endsWith("seed.ts")) {
-  seedDatabase();
-}
-
 // src/server.ts
 var __filename = fileURLToPath(import.meta.url);
 var __dirname = path.dirname(__filename);
@@ -1033,20 +882,6 @@ var PORT = process.env.PORT || 3e3;
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(rootDir, "public")));
-var initialized = false;
-app.use((req, res, next) => {
-  if (!initialized) {
-    try {
-      if (db.getGroups().length === 0) {
-        seedDatabase();
-      }
-      initialized = true;
-    } catch (e) {
-      console.error("Error auto-seeding:", e);
-    }
-  }
-  next();
-});
 function getUserMap() {
   const users = db.getUsers();
   const map = /* @__PURE__ */ new Map();
@@ -1528,19 +1363,15 @@ app.delete("/api/comments/:id", (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
-app.post("/api/seed", (req, res) => {
+app.post(["/api/clear-all-data", "/api/seed"], (req, res) => {
   try {
-    seedDatabase();
-    res.json({ success: true, message: "Database reseeded with Goa Beach Trip scenario!" });
+    db.clearAllData();
+    res.json({ success: true, message: "All data cleared successfully." });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 if (process.argv[1]?.endsWith("server.ts")) {
-  if (db.getGroups().length === 0) {
-    console.log("Database is empty. Populating initial seed data...");
-    seedDatabase();
-  }
   app.listen(PORT, () => {
     console.log(`
 =================================================`);

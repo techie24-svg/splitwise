@@ -99,7 +99,6 @@ const btnAddGroupLeft = document.getElementById('btnAddGroupLeft');
 const btnAddFriendLeft = document.getElementById('btnAddFriendLeft');
 const btnOpenGroupModal = document.getElementById('btnOpenGroupModal');
 const btnOpenFriendModal = document.getElementById('btnOpenFriendModal');
-const btnReseedDemo = document.getElementById('btnReseedDemo');
 
 // Center Topbar & Ribbon
 const topbarViewIcon = document.getElementById('topbarViewIcon');
@@ -219,13 +218,6 @@ function setupEventListeners() {
     modalGoogleAccount.classList.remove('hidden');
   });
 
-  document.querySelectorAll('.sw-demo-pill').forEach((pill) => {
-    pill.addEventListener('click', () => {
-      const email = pill.getAttribute('data-email');
-      if (email) quickLogin(email);
-    });
-  });
-
   document.getElementById('linkSwitchToSignup')?.addEventListener('click', (e) => {
     e.preventDefault();
     modalLogin.classList.add('hidden');
@@ -294,15 +286,6 @@ function setupEventListeners() {
   btnOpenFriendModal?.addEventListener('click', () => {
     userDropdownMenu.classList.add('hidden');
     openFriendModal();
-  });
-
-  // Reseed Demo Data
-  btnReseedDemo?.addEventListener('click', async () => {
-    userDropdownMenu.classList.add('hidden');
-    if (confirm('Reset database to the official Goa Beach Trip Splitwise demo dataset?')) {
-      await fetch('/api/seed', { method: 'POST' });
-      await checkAuthSession();
-    }
   });
 
   // Feed Action Buttons
@@ -410,36 +393,6 @@ function setupEventListeners() {
     }
   });
 }
-
-// 1-Click Quick Demo Login
-window.quickFillLogin = function (email) {
-  const emailInput = document.getElementById('loginEmail');
-  const pwdInput = document.getElementById('loginPassword');
-  if (emailInput) emailInput.value = email;
-  if (pwdInput) pwdInput.value = 'password123';
-};
-
-window.quickLogin = async function (email) {
-  try {
-    const res = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password: 'password123' }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Login failed');
-
-    authToken = data.data.token;
-    currentUser = data.data.user;
-    localStorage.setItem('splitwise_auth_token', authToken);
-
-    modalLogin?.classList.add('hidden');
-    showAuthenticatedUI();
-    await loadInitialData();
-  } catch (err) {
-    alert('Login error: ' + err.message);
-  }
-};
 
 window.executeGoogleLogin = async function (name, email, avatarUrl) {
   try {
