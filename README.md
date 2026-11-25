@@ -6,7 +6,8 @@ A complete, production-grade implementation of the **Splitwise Core Expense & De
 3. **REST API**: Clean Express HTTP API for managing users, groups, multi-payer expenses, and debt settlements.
 4. **Interactive Web UI Dashboard**: Modern responsive UI with live settlement flow cards (`Debtor ── ₹Amount ──▶ Creditor`), net balance badges, multi-type split calculator, and 1-click settlement.
 
-GitHub Repository: [**github.com/techie24-svg/splitwise**](https://github.com/techie24-svg/splitwise)
+GitHub Repository: [**github.com/techie24-svg/splitwise**](https://github.com/techie24-svg/splitwise)  
+Live Production Deployment: [**splitwise-seven-rho.vercel.app**](https://splitwise-seven-rho.vercel.app)
 
 ---
 
