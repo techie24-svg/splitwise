@@ -7,6 +7,28 @@ export interface User {
   name: string;
   email?: string;
   avatarUrl?: string;
+  defaultCurrency?: string;
+  passwordHash?: string;
+  salt?: string;
+}
+
+export interface Session {
+  token: string;
+  userId: string;
+  expiresAt: Date;
+  createdAt: Date;
+}
+
+export interface Activity {
+  id: string;
+  userId: string;
+  userName?: string;
+  userAvatar?: string;
+  groupId?: string;
+  groupName?: string;
+  type: 'expense_created' | 'expense_deleted' | 'settlement' | 'comment' | 'group_created' | 'user_joined';
+  description: string;
+  createdAt: Date;
 }
 
 export interface Group {
@@ -49,10 +71,13 @@ export interface Debt {
   fromUser: string;       // Debtor (owes money)
   toUser: string;         // Creditor (gets paid)
   amount: number;         // Amount to be settled
+  fromUserName?: string;
+  toUserName?: string;
 }
 
 export interface NetBalance {
   userId: string;
+  userName?: string;
   balance: number;        // Positive = is owed money (creditor); Negative = owes money (debtor)
 }
 
@@ -79,4 +104,3 @@ export interface FriendBalance {
   netBalance: number; // > 0: friend owes you, < 0: you owe friend
   currency: string;
 }
-

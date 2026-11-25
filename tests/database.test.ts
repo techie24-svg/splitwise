@@ -118,4 +118,44 @@ assert.strictEqual(comments.length, 1);
 assert.strictEqual(comments[0].userName, 'Bob');
 console.log('✓ Test 7: Expense comments thread persistence passed.');
 
+// 8. Auth: Registration, Password Verification & Sessions
+const registered = testDb.registerUser({
+  name: 'Diana Prince',
+  email: 'diana@superhero.com',
+  password: 'securePassword123!',
+  defaultCurrency: 'USD',
+});
+assert.strictEqual(registered.user.name, 'Diana Prince');
+assert(registered.token.length > 20, 'Should return secure session token');
+
+// Check login with correct password
+const loginSuccess = testDb.loginUser('diana@superhero.com', 'securePassword123!');
+assert(loginSuccess !== null, 'Login should succeed with correct credentials');
+assert.strictEqual(loginSuccess.user.id, registered.user.id);
+
+// Check login with incorrect password
+const loginFail = testDb.loginUser('diana@superhero.com', 'wrongpassword');
+assert.strictEqual(loginFail, null, 'Login should fail with wrong password');
+
+// Check session retrieval
+const sessionUser = testDb.getSessionUser(loginSuccess.token);
+assert(sessionUser !== null);
+assert.strictEqual(sessionUser.name, 'Diana Prince');
+console.log('✓ Test 8: User registration, cryptographic password verification & sessions passed.');
+
+// 9. Activity Logging & CSV Export
+testDb.logActivity({
+  userId: registered.user.id,
+  type: 'expense_created',
+  description: 'Diana added "Lasso of Truth" ($100.00)',
+});
+const activities = testDb.getActivities(10);
+assert(activities.length >= 1, 'Should log and retrieve activities');
+assert.strictEqual(activities[0].userId, registered.user.id);
+
+const csv = testDb.exportGroupExpensesCSV(group.id);
+assert(csv.includes('Gas'), 'CSV export should include Gas expense');
+assert(csv.includes('Snacks'), 'CSV export should include Snacks expense');
+console.log('✓ Test 9: Activity stream audit logging & CSV export passed.');
+
 console.log('\nAll Database Tests Passed Successfully! 🚀');

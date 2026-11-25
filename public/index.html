@@ -11,226 +11,426 @@
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%235bc5a7'><path d='M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5'/></svg>">
 </head>
 <body>
-  <!-- Splitwise Global Header -->
-  <header class="sw-header">
-    <div class="sw-header-container">
-      <div class="sw-brand" id="brandHomeLink" title="Splitwise Dashboard">
-        <!-- Official Splitwise Logo Icon & Wordmark -->
-        <div class="sw-logo-icon">
-          <svg viewBox="0 0 24 24" width="22" height="22" fill="white">
-            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-          </svg>
-        </div>
-        <span class="sw-brand-text">splitwise</span>
-      </div>
 
-      <!-- Right Profile Menu -->
-      <div class="sw-user-profile-menu">
-        <div class="sw-user-badge" id="btnUserMenuToggle">
-          <span class="sw-user-avatar" id="headerUserAvatar">👤</span>
-          <span class="sw-user-name" id="headerUserName">Loading...</span>
-          <span class="sw-caret">▾</span>
+  <!-- ============================================== -->
+  <!-- 1. SPLITWISE LANDING PAGE (LOGGED-OUT VIEW)     -->
+  <!-- ============================================== -->
+  <div id="landingView" class="sw-landing-wrapper hidden">
+    <!-- Landing Header -->
+    <header class="sw-landing-header">
+      <div class="sw-landing-header-container">
+        <div class="sw-brand">
+          <div class="sw-logo-icon">
+            <svg viewBox="0 0 24 24" width="26" height="26" fill="white">
+              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+            </svg>
+          </div>
+          <span class="sw-brand-text">splitwise</span>
         </div>
-
-        <!-- User Dropdown Menu -->
-        <div class="sw-dropdown-menu hidden" id="userDropdownMenu">
-          <div class="sw-dropdown-header">
-            <span class="sw-dropdown-label">SWITCH USER</span>
-            <select id="currentUserSelect" class="sw-user-select"></select>
-          </div>
-          <div class="sw-dropdown-divider"></div>
-          <button class="sw-dropdown-item" id="btnOpenGroupModal">
-            <span>👥</span> Create a group
-          </button>
-          <button class="sw-dropdown-item" id="btnOpenFriendModal">
-            <span>🤝</span> Add a friend
-          </button>
-          <button class="sw-dropdown-item" id="btnReseedDemo">
-            <span>🔄</span> Reset demo data (Goa Trip)
-          </button>
-          <div class="sw-dropdown-divider"></div>
-          <div class="sw-dropdown-item text-muted">
-            <small>Authenticated: Reverse-Engineered REA</small>
-          </div>
+        <div class="sw-landing-nav-actions">
+          <button class="sw-btn-landing-login" id="btnLandingLogin">Log in</button>
+          <button class="sw-btn-landing-signup" id="btnLandingSignup">Sign up</button>
         </div>
       </div>
-    </div>
-  </header>
+    </header>
 
-  <!-- Authentic Splitwise 3-Column Container -->
-  <div class="sw-main-wrapper">
-    <div class="sw-app-sheet">
-
-      <!-- ============================================== -->
-      <!-- COLUMN 1: LEFT NAVIGATION SIDEBAR             -->
-      <!-- ============================================== -->
-      <aside class="sw-col-left" id="leftSidebar">
-        <!-- Primary Nav Links -->
-        <nav class="sw-sidebar-nav">
-          <button class="sw-nav-item active" id="navDashboard" data-view="dashboard">
-            <svg class="sw-nav-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-              <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
-              <polyline points="2 17 12 22 22 17"></polyline>
-              <polyline points="2 12 12 17 22 12"></polyline>
-            </svg>
-            <span>Dashboard</span>
-          </button>
-          <button class="sw-nav-item" id="navRecentActivity" data-view="activity">
-            <svg class="sw-nav-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
-            </svg>
-            <span>Recent activity</span>
-          </button>
-          <button class="sw-nav-item" id="navAllExpenses" data-view="expenses">
-            <svg class="sw-nav-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="8" y1="6" x2="21" y2="6"></line>
-              <line x1="8" y1="12" x2="21" y2="12"></line>
-              <line x1="8" y1="18" x2="21" y2="18"></line>
-              <line x1="3" y1="6" x2="3.01" y2="6"></line>
-              <line x1="3" y1="12" x2="3.01" y2="12"></line>
-              <line x1="3" y1="18" x2="3.01" y2="18"></line>
-            </svg>
-            <span>All expenses</span>
-          </button>
-        </nav>
-
-        <!-- GROUPS Section -->
-        <div class="sw-sidebar-section">
-          <div class="sw-section-header">
-            <span class="sw-section-title">GROUPS</span>
-            <button class="sw-btn-add-text" id="btnAddGroupLeft" title="Create new group">+ add</button>
-          </div>
-          <div class="sw-sidebar-list" id="sidebarGroupsList">
-            <!-- Dynamically populated groups -->
-          </div>
+    <!-- Landing Hero Section -->
+    <section class="sw-hero-section">
+      <div class="sw-hero-content">
+        <h1 class="sw-hero-title">Less stress when sharing expenses with anyone.</h1>
+        <p class="sw-hero-subtitle">
+          Keep track of your shared expenses and balances with housemates, trips, groups, friends, and family.
+        </p>
+        <div class="sw-hero-actions">
+          <button class="sw-btn-hero-cta" id="btnHeroSignup">Sign up</button>
         </div>
 
-        <!-- FRIENDS Section -->
-        <div class="sw-sidebar-section">
-          <div class="sw-section-header">
-            <span class="sw-section-title">FRIENDS</span>
-            <button class="sw-btn-add-text" id="btnAddFriendLeft" title="Add a friend">+ add</button>
-          </div>
-          <div class="sw-sidebar-list" id="sidebarFriendsList">
-            <!-- Dynamically populated friends with balances -->
-          </div>
-        </div>
-
-        <!-- Invite Friends Widget -->
-        <div class="sw-invite-widget">
-          <span class="sw-invite-title">Invite friends</span>
-          <div class="sw-invite-input-group">
-            <input type="email" id="inviteEmailInput" placeholder="Enter an email address" class="sw-invite-input">
-            <button class="sw-btn-invite" id="btnSendInvite">Send invite</button>
+        <!-- 1-Click Instant Demo Credentials -->
+        <div class="sw-demo-quick-bar">
+          <span class="sw-demo-bar-label">⚡ 1-CLICK INSTANT DEMO ACCOUNTS:</span>
+          <div class="sw-demo-pills">
+            <button class="sw-demo-pill" data-email="yash@example.com">👨‍💻 Yash</button>
+            <button class="sw-demo-pill" data-email="alice@example.com">👩‍🎨 Alice</button>
+            <button class="sw-demo-pill" data-email="bob@example.com">🏄‍♂️ Bob</button>
+            <button class="sw-demo-pill" data-email="charlie@example.com">🎸 Charlie</button>
+            <button class="sw-demo-pill" data-email="diana@example.com">📸 Diana</button>
           </div>
         </div>
-      </aside>
+      </div>
+    </section>
 
-      <!-- ============================================== -->
-      <!-- COLUMN 2: CENTER MAIN EXPENSE FEED            -->
-      <!-- ============================================== -->
-      <main class="sw-col-center" id="centerColumn">
-        <!-- Top Action Header Bar -->
-        <div class="sw-topbar">
-          <div class="sw-topbar-left">
-            <div class="sw-view-icon" id="topbarViewIcon">📊</div>
-            <div class="sw-topbar-title-wrap">
-              <h1 class="sw-topbar-title" id="centerTitle">Dashboard</h1>
-              <span class="sw-topbar-subtitle" id="centerSubtitle">Overall balance and activity</span>
+    <!-- Splitwise Features Grid -->
+    <section class="sw-landing-features">
+      <div class="sw-features-container">
+        <div class="sw-feature-card">
+          <div class="sw-feature-icon">📊</div>
+          <h3>Track balances</h3>
+          <p>Keep track of shared expenses, balances, and who owes who across trips, roommates, or dinner bills.</p>
+        </div>
+        <div class="sw-feature-card">
+          <div class="sw-feature-icon">⚡</div>
+          <h3>Min-Cash-Flow Optimization</h3>
+          <p>Greedy graph simplification consolidates circular debts into at most N-1 transactions.</p>
+        </div>
+        <div class="sw-feature-card">
+          <div class="sw-feature-icon">💬</div>
+          <h3>Flexible Splits & Discussions</h3>
+          <p>Split bills equally, by exact amounts, percentages, or shares, complete with comment threads.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Landing Footer -->
+    <footer class="sw-landing-footer">
+      <p>© 2026 Splitwise Authentic Replica. Built with Node 24 native SQLite & Min-Cash-Flow Engine.</p>
+    </footer>
+  </div>
+
+  <!-- ============================================== -->
+  <!-- 2. SPLITWISE AUTHENTICATED APP (LOGGED-IN VIEW)-->
+  <!-- ============================================== -->
+  <div id="authenticatedApp" class="sw-authenticated-wrapper">
+    <!-- Splitwise Global Header -->
+    <header class="sw-header">
+      <div class="sw-header-container">
+        <div class="sw-brand" id="brandHomeLink" title="Splitwise Dashboard">
+          <div class="sw-logo-icon">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="white">
+              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+            </svg>
+          </div>
+          <span class="sw-brand-text">splitwise</span>
+        </div>
+
+        <!-- Right Profile Menu -->
+        <div class="sw-user-profile-menu">
+          <div class="sw-user-badge" id="btnUserMenuToggle">
+            <span class="sw-user-avatar" id="headerUserAvatar">👤</span>
+            <span class="sw-user-name" id="headerUserName">Loading...</span>
+            <span class="sw-caret">▾</span>
+          </div>
+
+          <!-- User Dropdown Menu -->
+          <div class="sw-dropdown-menu hidden" id="userDropdownMenu">
+            <div class="sw-dropdown-user-header">
+              <span class="sw-dropdown-user-name" id="dropdownUserName">User</span>
+              <span class="sw-dropdown-user-email" id="dropdownUserEmail">email@example.com</span>
+            </div>
+            <div class="sw-dropdown-divider"></div>
+            <button class="sw-dropdown-item" id="btnOpenProfileModal">
+              <span>⚙️</span> Your account
+            </button>
+            <button class="sw-dropdown-item" id="btnExportGroupCSV">
+              <span>📥</span> Export group to CSV
+            </button>
+            <button class="sw-dropdown-item" id="btnOpenGroupModal">
+              <span>👥</span> Create a group
+            </button>
+            <button class="sw-dropdown-item" id="btnOpenFriendModal">
+              <span>🤝</span> Add a friend
+            </button>
+            <button class="sw-dropdown-item" id="btnReseedDemo">
+              <span>🔄</span> Reset demo data (Goa Trip)
+            </button>
+            <div class="sw-dropdown-divider"></div>
+            <button class="sw-dropdown-item text-orange" id="btnLogout">
+              <span>🚪</span> Log out
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Authentic Splitwise 3-Column Container -->
+    <div class="sw-main-wrapper">
+      <div class="sw-app-sheet">
+
+        <!-- COLUMN 1: LEFT NAVIGATION SIDEBAR -->
+        <aside class="sw-col-left" id="leftSidebar">
+          <!-- Primary Nav Links -->
+          <nav class="sw-sidebar-nav">
+            <button class="sw-nav-item active" id="navDashboard" data-view="dashboard">
+              <svg class="sw-nav-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                <polyline points="2 17 12 22 22 17"></polyline>
+                <polyline points="2 12 12 17 22 12"></polyline>
+              </svg>
+              <span>Dashboard</span>
+            </button>
+            <button class="sw-nav-item" id="navRecentActivity" data-view="activity">
+              <svg class="sw-nav-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+              </svg>
+              <span>Recent activity</span>
+            </button>
+            <button class="sw-nav-item" id="navAllExpenses" data-view="expenses">
+              <svg class="sw-nav-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="8" y1="6" x2="21" y2="6"></line>
+                <line x1="8" y1="12" x2="21" y2="12"></line>
+                <line x1="8" y1="18" x2="21" y2="18"></line>
+                <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                <line x1="3" y1="18" x2="3.01" y2="18"></line>
+              </svg>
+              <span>All expenses</span>
+            </button>
+          </nav>
+
+          <!-- GROUPS Section -->
+          <div class="sw-sidebar-section">
+            <div class="sw-section-header">
+              <span class="sw-section-title">GROUPS</span>
+              <button class="sw-btn-add-text" id="btnAddGroupLeft" title="Create new group">+ add</button>
+            </div>
+            <div class="sw-sidebar-list" id="sidebarGroupsList">
+              <!-- Dynamically populated groups -->
             </div>
           </div>
 
-          <div class="sw-topbar-actions">
-            <button class="sw-btn-primary-orange" id="btnOpenExpenseModal">
-              Add an expense
-            </button>
-            <button class="sw-btn-primary-teal" id="btnOpenSettleModal">
-              Settle up
-            </button>
-          </div>
-        </div>
-
-        <!-- Splitwise Signature 3-Block Summary Ribbon -->
-        <div class="sw-summary-ribbon" id="summaryRibbon">
-          <div class="sw-ribbon-block">
-            <span class="sw-ribbon-label">total balance</span>
-            <span class="sw-ribbon-val" id="ribbonTotalBalance">₹0.00</span>
-            <span class="sw-ribbon-sub" id="ribbonTotalBalanceSub">all settled up</span>
-          </div>
-          <div class="sw-ribbon-block">
-            <span class="sw-ribbon-label">you owe</span>
-            <span class="sw-ribbon-val text-orange" id="ribbonYouOwe">₹0.00</span>
-            <span class="sw-ribbon-sub" id="ribbonYouOweSub">0 friends</span>
-          </div>
-          <div class="sw-ribbon-block">
-            <span class="sw-ribbon-label">you are owed</span>
-            <span class="sw-ribbon-val text-teal" id="ribbonYouAreOwed">₹0.00</span>
-            <span class="sw-ribbon-sub" id="ribbonYouAreOwedSub">0 friends</span>
-          </div>
-        </div>
-
-        <!-- Center Subheader / View Tabs -->
-        <div class="sw-feed-subheader">
-          <div class="sw-feed-filters">
-            <button class="sw-feed-tab active" id="tabViewExpenses">
-              Expenses
-            </button>
-            <button class="sw-feed-tab" id="tabViewSimplification">
-              ✨ Min-Cash-Flow Simplification
-            </button>
-          </div>
-          <div class="sw-feed-mode-toggle hidden" id="simplificationToggles">
-            <button class="sw-toggle-chip active" id="btnModeSimplified">Simplified</button>
-            <button class="sw-toggle-chip" id="btnModeUnsimplified">Unsimplified</button>
-          </div>
-        </div>
-
-        <!-- Primary Feed Container -->
-        <div class="sw-feed-content">
-          <!-- Expenses Feed Timeline -->
-          <div class="sw-expenses-list" id="expensesFeed">
-            <!-- Dynamically populated Splitwise expense items -->
+          <!-- FRIENDS Section -->
+          <div class="sw-sidebar-section">
+            <div class="sw-section-header">
+              <span class="sw-section-title">FRIENDS</span>
+              <button class="sw-btn-add-text" id="btnAddFriendLeft" title="Add a friend">+ add</button>
+            </div>
+            <div class="sw-sidebar-list" id="sidebarFriendsList">
+              <!-- Dynamically populated friends with balances -->
+            </div>
           </div>
 
-          <!-- Min-Cash-Flow Debt Simplification Matrix (Shown when tab active) -->
-          <div class="sw-simplification-view hidden" id="simplificationFeed">
-            <div class="sw-simplification-banner">
-              <div class="sw-simplification-stat">
-                <span class="sw-stat-num" id="statReductionPct">0%</span>
-                <span class="sw-stat-label">Debt Volume Reduced</span>
-              </div>
-              <div class="sw-simplification-stat">
-                <span class="sw-stat-num" id="statTransfersCount">0</span>
-                <span class="sw-stat-label">Simplified Transfers</span>
-              </div>
-              <div class="sw-simplification-stat">
-                <span class="sw-stat-num" id="statTotalVolume">₹0.00</span>
-                <span class="sw-stat-label">Optimized Cash Flow</span>
+          <!-- Invite Friends Widget -->
+          <div class="sw-invite-widget">
+            <span class="sw-invite-title">Invite friends</span>
+            <div class="sw-invite-input-group">
+              <input type="email" id="inviteEmailInput" placeholder="Enter an email address" class="sw-invite-input">
+              <button class="sw-btn-invite" id="btnSendInvite">Send invite</button>
+            </div>
+          </div>
+        </aside>
+
+        <!-- COLUMN 2: CENTER MAIN EXPENSE FEED -->
+        <main class="sw-col-center" id="centerColumn">
+          <!-- Top Action Header Bar -->
+          <div class="sw-topbar">
+            <div class="sw-topbar-left">
+              <div class="sw-view-icon" id="topbarViewIcon">📊</div>
+              <div class="sw-topbar-title-wrap">
+                <h1 class="sw-topbar-title" id="centerTitle">Dashboard</h1>
+                <span class="sw-topbar-subtitle" id="centerSubtitle">Overall balance and activity</span>
               </div>
             </div>
 
-            <div class="sw-transfers-container" id="simplificationTransfersList">
-              <!-- Dynamically populated transfer arrows -->
+            <div class="sw-topbar-actions">
+              <button class="sw-btn-primary-orange" id="btnOpenExpenseModal">
+                Add an expense
+              </button>
+              <button class="sw-btn-primary-teal" id="btnOpenSettleModal">
+                Settle up
+              </button>
             </div>
           </div>
-        </div>
-      </main>
 
-      <!-- ============================================== -->
-      <!-- COLUMN 3: RIGHT SIDEBAR (BALANCES & DEBTS)     -->
-      <!-- ============================================== -->
-      <aside class="sw-col-right" id="rightSidebar">
-        <!-- Dynamic Right Sidebar Content -->
-        <div class="sw-right-content" id="rightSidebarContent">
-          <!-- Populated dynamically: Dashboard breakdown OR Group Balances OR Friend Balances -->
-        </div>
-      </aside>
+          <!-- Splitwise Signature 3-Block Summary Ribbon -->
+          <div class="sw-summary-ribbon" id="summaryRibbon">
+            <div class="sw-ribbon-block">
+              <span class="sw-ribbon-label">total balance</span>
+              <span class="sw-ribbon-val" id="ribbonTotalBalance">₹0.00</span>
+              <span class="sw-ribbon-sub" id="ribbonTotalBalanceSub">all settled up</span>
+            </div>
+            <div class="sw-ribbon-block">
+              <span class="sw-ribbon-label">you owe</span>
+              <span class="sw-ribbon-val text-orange" id="ribbonYouOwe">₹0.00</span>
+              <span class="sw-ribbon-sub" id="ribbonYouOweSub">0 friends</span>
+            </div>
+            <div class="sw-ribbon-block">
+              <span class="sw-ribbon-label">you are owed</span>
+              <span class="sw-ribbon-val text-teal" id="ribbonYouAreOwed">₹0.00</span>
+              <span class="sw-ribbon-sub" id="ribbonYouAreOwedSub">0 friends</span>
+            </div>
+          </div>
 
+          <!-- Center Subheader / View Tabs -->
+          <div class="sw-feed-subheader" id="feedSubheader">
+            <div class="sw-feed-filters">
+              <button class="sw-feed-tab active" id="tabViewExpenses">
+                Expenses
+              </button>
+              <button class="sw-feed-tab" id="tabViewSimplification">
+                ✨ Min-Cash-Flow Simplification
+              </button>
+            </div>
+            <div class="sw-feed-mode-toggle hidden" id="simplificationToggles">
+              <button class="sw-toggle-chip active" id="btnModeSimplified">Simplified</button>
+              <button class="sw-toggle-chip" id="btnModeUnsimplified">Unsimplified</button>
+            </div>
+          </div>
+
+          <!-- Primary Feed Container -->
+          <div class="sw-feed-content">
+            <!-- Expenses Feed Timeline -->
+            <div class="sw-expenses-list" id="expensesFeed"></div>
+
+            <!-- Recent Activity Timeline (Audit Stream) -->
+            <div class="sw-activities-list hidden" id="activitiesFeed"></div>
+
+            <!-- Min-Cash-Flow Debt Simplification Matrix -->
+            <div class="sw-simplification-view hidden" id="simplificationFeed">
+              <div class="sw-simplification-banner">
+                <div class="sw-simplification-stat">
+                  <span class="sw-stat-num" id="statReductionPct">0%</span>
+                  <span class="sw-stat-label">Debt Volume Reduced</span>
+                </div>
+                <div class="sw-simplification-stat">
+                  <span class="sw-stat-num" id="statTransfersCount">0</span>
+                  <span class="sw-stat-label">Simplified Transfers</span>
+                </div>
+                <div class="sw-simplification-stat">
+                  <span class="sw-stat-num" id="statTotalVolume">₹0.00</span>
+                  <span class="sw-stat-label">Optimized Cash Flow</span>
+                </div>
+              </div>
+              <div class="sw-transfers-container" id="simplificationTransfersList"></div>
+            </div>
+          </div>
+        </main>
+
+        <!-- COLUMN 3: RIGHT SIDEBAR (BALANCES & DEBTS) -->
+        <aside class="sw-col-right" id="rightSidebar">
+          <div class="sw-right-content" id="rightSidebarContent"></div>
+        </aside>
+
+      </div>
     </div>
   </div>
 
   <!-- ============================================== -->
-  <!-- MODAL 1: ADD AN EXPENSE (SPLITWISE AUTHENTIC)   -->
+  <!-- MODAL: LOGIN TO SPLITWISE                     -->
+  <!-- ============================================== -->
+  <div class="sw-modal-overlay hidden" id="modalLogin">
+    <div class="sw-modal-dialog sw-modal-auth">
+      <div class="sw-modal-header">
+        <h3 class="sw-modal-title">Log in to Splitwise</h3>
+        <button class="sw-modal-close" data-close="modalLogin">&times;</button>
+      </div>
+
+      <form id="formLogin" class="sw-modal-body">
+        <div class="sw-form-group">
+          <label class="sw-field-label">Email address</label>
+          <input type="email" id="loginEmail" class="sw-select-control" placeholder="you@example.com" required>
+        </div>
+
+        <div class="sw-form-group">
+          <label class="sw-field-label">Password</label>
+          <input type="password" id="loginPassword" class="sw-select-control" placeholder="••••••••" required>
+        </div>
+
+        <div class="sw-auth-quick-select">
+          <span class="sw-field-label" style="display:block; margin-bottom:4px;">Quick demo login:</span>
+          <div class="sw-demo-pills">
+            <button type="button" class="sw-demo-pill" onclick="quickFillLogin('yash@example.com')">👨‍💻 Yash</button>
+            <button type="button" class="sw-demo-pill" onclick="quickFillLogin('alice@example.com')">👩‍🎨 Alice</button>
+            <button type="button" class="sw-demo-pill" onclick="quickFillLogin('bob@example.com')">🏄‍♂️ Bob</button>
+          </div>
+        </div>
+
+        <div class="sw-modal-footer" style="justify-content: space-between;">
+          <a href="#" class="sw-auth-switch-link" id="linkSwitchToSignup">Don't have an account? Sign up</a>
+          <button type="submit" class="sw-btn-save-teal">Log in</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============================================== -->
+  <!-- MODAL: SIGN UP FOR SPLITWISE                   -->
+  <!-- ============================================== -->
+  <div class="sw-modal-overlay hidden" id="modalSignup">
+    <div class="sw-modal-dialog sw-modal-auth">
+      <div class="sw-modal-header">
+        <h3 class="sw-modal-title">Sign up for Splitwise</h3>
+        <button class="sw-modal-close" data-close="modalSignup">&times;</button>
+      </div>
+
+      <form id="formSignup" class="sw-modal-body">
+        <div class="sw-form-group">
+          <label class="sw-field-label">Full Name</label>
+          <input type="text" id="signupName" class="sw-select-control" placeholder="e.g. Jane Doe" required>
+        </div>
+
+        <div class="sw-form-group">
+          <label class="sw-field-label">Email address</label>
+          <input type="email" id="signupEmail" class="sw-select-control" placeholder="jane@example.com" required>
+        </div>
+
+        <div class="sw-form-group">
+          <label class="sw-field-label">Password (at least 6 characters)</label>
+          <input type="password" id="signupPassword" class="sw-select-control" placeholder="••••••••" minlength="6" required>
+        </div>
+
+        <div class="sw-form-group">
+          <label class="sw-field-label">Default Currency</label>
+          <select id="signupCurrency" class="sw-select-control">
+            <option value="INR">INR (₹) - Indian Rupee</option>
+            <option value="USD">USD ($) - US Dollar</option>
+            <option value="EUR">EUR (€) - Euro</option>
+            <option value="GBP">GBP (£) - British Pound</option>
+          </select>
+        </div>
+
+        <div class="sw-modal-footer" style="justify-content: space-between;">
+          <a href="#" class="sw-auth-switch-link" id="linkSwitchToLogin">Already have an account? Log in</a>
+          <button type="submit" class="sw-btn-save-teal">Sign up</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============================================== -->
+  <!-- MODAL: YOUR ACCOUNT / PROFILE SETTINGS         -->
+  <!-- ============================================== -->
+  <div class="sw-modal-overlay hidden" id="modalProfile">
+    <div class="sw-modal-dialog">
+      <div class="sw-modal-header">
+        <h3 class="sw-modal-title">Your account settings</h3>
+        <button class="sw-modal-close" data-close="modalProfile">&times;</button>
+      </div>
+
+      <form id="formProfile" class="sw-modal-body">
+        <div class="sw-form-group">
+          <label class="sw-field-label">Full Name</label>
+          <input type="text" id="profileName" class="sw-select-control" required>
+        </div>
+
+        <div class="sw-form-group">
+          <label class="sw-field-label">Avatar Icon / Emoji</label>
+          <input type="text" id="profileAvatar" class="sw-select-control" placeholder="e.g. 👨‍💻, 👩‍🎨, 🚀">
+        </div>
+
+        <div class="sw-form-group">
+          <label class="sw-field-label">Default Currency</label>
+          <select id="profileCurrency" class="sw-select-control">
+            <option value="INR">INR (₹) - Indian Rupee</option>
+            <option value="USD">USD ($) - US Dollar</option>
+            <option value="EUR">EUR (€) - Euro</option>
+            <option value="GBP">GBP (£) - British Pound</option>
+          </select>
+        </div>
+
+        <div class="sw-form-group">
+          <label class="sw-field-label">New Password (leave blank to keep current)</label>
+          <input type="password" id="profileNewPassword" class="sw-select-control" placeholder="New password (optional)">
+        </div>
+
+        <div class="sw-modal-footer">
+          <button type="button" class="sw-btn-cancel" data-close="modalProfile">Cancel</button>
+          <button type="submit" class="sw-btn-save-teal">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============================================== -->
+  <!-- MODAL: ADD AN EXPENSE                         -->
   <!-- ============================================== -->
   <div class="sw-modal-overlay hidden" id="modalAddExpense">
     <div class="sw-modal-dialog">
@@ -240,22 +440,17 @@
       </div>
 
       <form id="formAddExpense" class="sw-modal-body">
-        <!-- Target Context: Group or Friend -->
         <div class="sw-form-row sw-target-selector">
           <label class="sw-form-label">With <strong>you</strong> and:</label>
-          <select id="modalExpContext" class="sw-select-control">
-            <!-- Populated with current group and friends -->
-          </select>
+          <select id="modalExpContext" class="sw-select-control"></select>
         </div>
 
         <div class="sw-expense-hero-entry">
-          <!-- Category Icon Picker -->
           <div class="sw-category-selector" id="categorySelectorTrigger" title="Choose Category">
             <span id="selectedCategoryIcon" class="sw-category-big-icon">🍽️</span>
             <input type="hidden" id="expCategory" value="Food">
           </div>
 
-          <!-- Description and Amount -->
           <div class="sw-hero-inputs">
             <input type="text" id="expDesc" class="sw-input-desc" placeholder="Enter a description (e.g. Dinner, Taxi, Villa)" required>
             <div class="sw-input-amount-wrap">
@@ -265,7 +460,6 @@
           </div>
         </div>
 
-        <!-- Split Sentence / Controls -->
         <div class="sw-split-sentence-box">
           Paid by
           <select id="expPayer" class="sw-inline-select"></select>
@@ -273,7 +467,6 @@
           <span class="sw-clickable-link" id="btnToggleSplitType">equally</span>.
         </div>
 
-        <!-- Split Mode Selector Tabs -->
         <div class="sw-split-tabs-wrap hidden" id="splitTabsWrap">
           <div class="sw-split-tabs">
             <button type="button" class="sw-split-tab active" data-type="EQUAL">= Equally</button>
@@ -282,14 +475,9 @@
             <button type="button" class="sw-split-tab" data-type="SHARES">x/y Shares</button>
           </div>
           <input type="hidden" id="activeSplitType" value="EQUAL">
-
-          <!-- Dynamic Participants Split Table -->
-          <div class="sw-participants-split-box" id="participantsSplitBox">
-            <!-- Dynamic participant inputs -->
-          </div>
+          <div class="sw-participants-split-box" id="participantsSplitBox"></div>
         </div>
 
-        <!-- Date & Meta Row -->
         <div class="sw-form-row-meta">
           <div class="sw-meta-field">
             <label class="sw-field-label">Date:</label>
@@ -317,7 +505,7 @@
   </div>
 
   <!-- ============================================== -->
-  <!-- MODAL 2: SETTLE UP (AUTHENTIC SPLITWISE)       -->
+  <!-- MODAL: SETTLE UP                              -->
   <!-- ============================================== -->
   <div class="sw-modal-overlay hidden" id="modalSettleUp">
     <div class="sw-modal-dialog">
@@ -362,7 +550,7 @@
   </div>
 
   <!-- ============================================== -->
-  <!-- MODAL 3: CREATE A NEW GROUP                   -->
+  <!-- MODAL: CREATE A GROUP                         -->
   <!-- ============================================== -->
   <div class="sw-modal-overlay hidden" id="modalCreateGroup">
     <div class="sw-modal-dialog">
@@ -399,9 +587,7 @@
 
         <div class="sw-form-group">
           <label class="sw-field-label">Group Members (select participants):</label>
-          <div class="sw-members-checkbox-list" id="groupMembersChecklist">
-            <!-- Populated with all available users -->
-          </div>
+          <div class="sw-members-checkbox-list" id="groupMembersChecklist"></div>
         </div>
 
         <div class="sw-modal-footer">
@@ -413,7 +599,7 @@
   </div>
 
   <!-- ============================================== -->
-  <!-- MODAL 4: ADD A FRIEND                         -->
+  <!-- MODAL: ADD A FRIEND                           -->
   <!-- ============================================== -->
   <div class="sw-modal-overlay hidden" id="modalAddFriend">
     <div class="sw-modal-dialog">

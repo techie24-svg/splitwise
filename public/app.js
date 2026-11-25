@@ -1,19 +1,15 @@
 /**
- * Splitwise Web Authentic Client
- * Built via REA (Reverse-Engineer-Anything) on Splitwise Web Application
- * Features:
- * - 3-Column Splitwise Desktop UI (Left nav, Center feed, Right balances)
- * - Greedy Min-Cash-Flow Debt Simplification (O(N) vs O(N^2))
- * - Dynamic Group & 1-on-1 Friend Ledgers
- * - Split Modes: Equal, Exact, Percent, Shares
- * - Live Expense Comments Thread & Realtime Balances
+ * Splitwise Authentic Full-Stack Web Application
+ * Complete with Authentication, Landing Page, Account Settings, Activity Stream & Min-Cash-Flow Engine
  */
 
 // Global State
+let currentUser = null;
+let authToken = localStorage.getItem('splitwise_auth_token') || null;
+
 let allUsers = [];
 let groups = [];
 let friends = [];
-let currentUserId = null;
 let currentView = 'dashboard'; // 'dashboard' | 'activity' | 'expenses' | 'group' | 'friend'
 let activeGroupId = null;
 let activeFriendId = null;
@@ -24,7 +20,7 @@ let groupSettlement = null;
 let feedTab = 'expenses'; // 'expenses' | 'simplification'
 let simplificationMode = 'simplified'; // 'simplified' | 'unsimplified'
 
-// Category Icons & Helpers
+// Category Icons
 const CATEGORY_ICONS = {
   Food: '🍽️',
   Transport: '🚗',
@@ -50,14 +46,49 @@ function parseMonthDay(dateStr) {
   };
 }
 
+function formatTimeAgo(dateStr) {
+  const diffMs = Date.now() - new Date(dateStr).getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 1) return 'Just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return new Date(dateStr).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+// Authenticated fetch wrapper
+function authFetch(url, options = {}) {
+  const headers = options.headers || {};
+  if (authToken) {
+    headers['Authorization'] = `Bearer ${authToken}`;
+  }
+  return fetch(url, { ...options, headers });
+}
+
 // DOM Elements
+const landingView = document.getElementById('landingView');
+const authenticatedApp = document.getElementById('authenticatedApp');
+
+// Landing Elements
+const btnLandingLogin = document.getElementById('btnLandingLogin');
+const btnLandingSignup = document.getElementById('btnLandingSignup');
+const btnHeroSignup = document.getElementById('btnHeroSignup');
+
+// Header Elements
 const brandHomeLink = document.getElementById('brandHomeLink');
 const btnUserMenuToggle = document.getElementById('btnUserMenuToggle');
 const userDropdownMenu = document.getElementById('userDropdownMenu');
 const headerUserAvatar = document.getElementById('headerUserAvatar');
 const headerUserName = document.getElementById('headerUserName');
-const currentUserSelect = document.getElementById('currentUserSelect');
+const dropdownUserName = document.getElementById('dropdownUserName');
+const dropdownUserEmail = document.getElementById('dropdownUserEmail');
+const btnLogout = document.getElementById('btnLogout');
+const btnOpenProfileModal = document.getElementById('btnOpenProfileModal');
+const btnExportGroupCSV = document.getElementById('btnExportGroupCSV');
 
+// Nav Items
 const navDashboard = document.getElementById('navDashboard');
 const navRecentActivity = document.getElementById('navRecentActivity');
 const navAllExpenses = document.getElementById('navAllExpenses');
@@ -70,6 +101,7 @@ const btnOpenGroupModal = document.getElementById('btnOpenGroupModal');
 const btnOpenFriendModal = document.getElementById('btnOpenFriendModal');
 const btnReseedDemo = document.getElementById('btnReseedDemo');
 
+// Center Topbar & Ribbon
 const topbarViewIcon = document.getElementById('topbarViewIcon');
 const centerTitle = document.getElementById('centerTitle');
 const centerSubtitle = document.getElementById('centerSubtitle');
@@ -83,6 +115,8 @@ const ribbonYouOweSub = document.getElementById('ribbonYouOweSub');
 const ribbonYouAreOwed = document.getElementById('ribbonYouAreOwed');
 const ribbonYouAreOwedSub = document.getElementById('ribbonYouAreOwedSub');
 
+// Center Feed Controls
+const feedSubheader = document.getElementById('feedSubheader');
 const tabViewExpenses = document.getElementById('tabViewExpenses');
 const tabViewSimplification = document.getElementById('tabViewSimplification');
 const simplificationToggles = document.getElementById('simplificationToggles');
@@ -90,6 +124,7 @@ const btnModeSimplified = document.getElementById('btnModeSimplified');
 const btnModeUnsimplified = document.getElementById('btnModeUnsimplified');
 
 const expensesFeed = document.getElementById('expensesFeed');
+const activitiesFeed = document.getElementById('activitiesFeed');
 const simplificationFeed = document.getElementById('simplificationFeed');
 const simplificationTransfersList = document.getElementById('simplificationTransfersList');
 const statReductionPct = document.getElementById('statReductionPct');
@@ -99,29 +134,96 @@ const statTotalVolume = document.getElementById('statTotalVolume');
 const rightSidebarContent = document.getElementById('rightSidebarContent');
 
 // Modals
+const modalLogin = document.getElementById('modalLogin');
+const modalSignup = document.getElementById('modalSignup');
+const modalProfile = document.getElementById('modalProfile');
 const modalAddExpense = document.getElementById('modalAddExpense');
 const modalSettleUp = document.getElementById('modalSettleUp');
 const modalCreateGroup = document.getElementById('modalCreateGroup');
 const modalAddFriend = document.getElementById('modalAddFriend');
 
+const formLogin = document.getElementById('formLogin');
+const formSignup = document.getElementById('formSignup');
+const formProfile = document.getElementById('formProfile');
 const formAddExpense = document.getElementById('formAddExpense');
 const formSettleUp = document.getElementById('formSettleUp');
 const formCreateGroup = document.getElementById('formCreateGroup');
 const formAddFriend = document.getElementById('formAddFriend');
 
-// Init
+// App Initialization
 document.addEventListener('DOMContentLoaded', async () => {
   setupEventListeners();
-  await loadInitialData();
+  await checkAuthSession();
 });
 
-// Event Listeners
-function setupEventListeners() {
-  // Brand Logo Click -> Return to Dashboard
-  brandHomeLink.addEventListener('click', () => switchView('dashboard'));
+// Check Session on Page Load
+async function checkAuthSession() {
+  if (authToken) {
+    try {
+      const res = await authFetch('/api/auth/me');
+      if (res.ok) {
+        const data = await res.json();
+        currentUser = data.data;
+        showAuthenticatedUI();
+        await loadInitialData();
+        return;
+      }
+    } catch (e) {
+      console.warn('Session check failed, reverting to landing page:', e);
+    }
+  }
 
-  // User Profile Dropdown
-  btnUserMenuToggle.addEventListener('click', (e) => {
+  // Not authenticated
+  showLandingUI();
+}
+
+function showLandingUI() {
+  landingView.classList.remove('hidden');
+  authenticatedApp.classList.add('hidden');
+}
+
+function showAuthenticatedUI() {
+  landingView.classList.add('hidden');
+  authenticatedApp.classList.remove('hidden');
+  updateCurrentUserUI();
+}
+
+function updateCurrentUserUI() {
+  if (!currentUser) return;
+  headerUserAvatar.innerText = currentUser.avatarUrl || '👤';
+  headerUserName.innerText = currentUser.name;
+  dropdownUserName.innerText = currentUser.name;
+  dropdownUserEmail.innerText = currentUser.email || '';
+}
+
+// Setup Event Listeners
+function setupEventListeners() {
+  // Landing Actions
+  btnLandingLogin?.addEventListener('click', () => modalLogin.classList.remove('hidden'));
+  btnLandingSignup?.addEventListener('click', () => modalSignup.classList.remove('hidden'));
+  btnHeroSignup?.addEventListener('click', () => modalSignup.classList.remove('hidden'));
+
+  document.querySelectorAll('.sw-demo-pill').forEach((pill) => {
+    pill.addEventListener('click', () => {
+      const email = pill.getAttribute('data-email');
+      if (email) quickLogin(email);
+    });
+  });
+
+  document.getElementById('linkSwitchToSignup')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    modalLogin.classList.add('hidden');
+    modalSignup.classList.remove('hidden');
+  });
+
+  document.getElementById('linkSwitchToLogin')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    modalSignup.classList.add('hidden');
+    modalLogin.classList.remove('hidden');
+  });
+
+  // Topbar Dropdown
+  btnUserMenuToggle?.addEventListener('click', (e) => {
     e.stopPropagation();
     userDropdownMenu.classList.toggle('hidden');
   });
@@ -132,45 +234,67 @@ function setupEventListeners() {
     }
   });
 
-  // Switch User
-  currentUserSelect.addEventListener('change', async (e) => {
-    currentUserId = e.target.value;
-    updateCurrentUserUI();
-    await reloadCurrentView();
+  // Logout
+  btnLogout?.addEventListener('click', async () => {
+    userDropdownMenu.classList.add('hidden');
+    await authFetch('/api/auth/logout', { method: 'POST' });
+    authToken = null;
+    currentUser = null;
+    localStorage.removeItem('splitwise_auth_token');
+    showLandingUI();
   });
 
-  // Primary Nav
-  navDashboard.addEventListener('click', () => switchView('dashboard'));
-  navRecentActivity.addEventListener('click', () => switchView('activity'));
-  navAllExpenses.addEventListener('click', () => switchView('expenses'));
+  // Profile Modal
+  btnOpenProfileModal?.addEventListener('click', () => {
+    userDropdownMenu.classList.add('hidden');
+    openProfileModal();
+  });
+
+  // CSV Export
+  btnExportGroupCSV?.addEventListener('click', () => {
+    userDropdownMenu.classList.add('hidden');
+    if (activeGroupId) {
+      window.open(`/api/groups/${activeGroupId}/export.csv`, '_blank');
+    } else if (groups.length > 0) {
+      window.open(`/api/groups/${groups[0].id}/export.csv`, '_blank');
+    } else {
+      alert('Please create or select a group to export.');
+    }
+  });
+
+  // Navigation Links
+  brandHomeLink?.addEventListener('click', () => switchView('dashboard'));
+  navDashboard?.addEventListener('click', () => switchView('dashboard'));
+  navRecentActivity?.addEventListener('click', () => switchView('activity'));
+  navAllExpenses?.addEventListener('click', () => switchView('expenses'));
 
   // Left Sidebar Action buttons
-  btnAddGroupLeft.addEventListener('click', openGroupModal);
-  btnAddFriendLeft.addEventListener('click', openFriendModal);
-  btnOpenGroupModal.addEventListener('click', () => {
+  btnAddGroupLeft?.addEventListener('click', openGroupModal);
+  btnAddFriendLeft?.addEventListener('click', openFriendModal);
+  btnOpenGroupModal?.addEventListener('click', () => {
     userDropdownMenu.classList.add('hidden');
     openGroupModal();
   });
-  btnOpenFriendModal.addEventListener('click', () => {
+  btnOpenFriendModal?.addEventListener('click', () => {
     userDropdownMenu.classList.add('hidden');
     openFriendModal();
   });
 
   // Reseed Demo Data
-  btnReseedDemo.addEventListener('click', async () => {
+  btnReseedDemo?.addEventListener('click', async () => {
     userDropdownMenu.classList.add('hidden');
-    if (confirm('Reset database to the official Goa Beach Trip Splitwise demo?')) {
+    if (confirm('Reset database to the official Goa Beach Trip Splitwise demo dataset?')) {
       await fetch('/api/seed', { method: 'POST' });
-      await loadInitialData();
+      await checkAuthSession();
     }
   });
 
-  // Main Topbar Action Buttons
-  btnOpenExpenseModal.addEventListener('click', () => openExpenseModal());
-  btnOpenSettleModal.addEventListener('click', () => openSettleModal());
+  // Feed Action Buttons
+  btnOpenExpenseModal?.addEventListener('click', () => openExpenseModal());
+  btnOpenSettleModal?.addEventListener('click', () => openSettleModal());
 
   // Center Feed Tab Switching
-  tabViewExpenses.addEventListener('click', () => {
+  tabViewExpenses?.addEventListener('click', () => {
     feedTab = 'expenses';
     tabViewExpenses.classList.add('active');
     tabViewSimplification.classList.remove('active');
@@ -179,7 +303,7 @@ function setupEventListeners() {
     simplificationToggles.classList.add('hidden');
   });
 
-  tabViewSimplification.addEventListener('click', () => {
+  tabViewSimplification?.addEventListener('click', () => {
     feedTab = 'simplification';
     tabViewSimplification.classList.add('active');
     tabViewExpenses.classList.remove('active');
@@ -189,15 +313,14 @@ function setupEventListeners() {
     renderSimplificationFeed();
   });
 
-  // Simplification Mode Toggle
-  btnModeSimplified.addEventListener('click', () => {
+  btnModeSimplified?.addEventListener('click', () => {
     simplificationMode = 'simplified';
     btnModeSimplified.classList.add('active');
     btnModeUnsimplified.classList.remove('active');
     renderSimplificationFeed();
   });
 
-  btnModeUnsimplified.addEventListener('click', () => {
+  btnModeUnsimplified?.addEventListener('click', () => {
     simplificationMode = 'unsimplified';
     btnModeUnsimplified.classList.add('active');
     btnModeSimplified.classList.remove('active');
@@ -220,7 +343,7 @@ function setupEventListeners() {
     });
   });
 
-  // Expense Modal Category Selector
+  // Split Category Selector
   const expCategorySelect = document.getElementById('expCategorySelect');
   const selectedCategoryIcon = document.getElementById('selectedCategoryIcon');
   const expCategory = document.getElementById('expCategory');
@@ -231,7 +354,7 @@ function setupEventListeners() {
     selectedCategoryIcon.innerText = CATEGORY_ICONS[cat] || '🛒';
   });
 
-  // Expense Modal Split Options
+  // Expense Split Controls
   const btnToggleSplitType = document.getElementById('btnToggleSplitType');
   const splitTabsWrap = document.getElementById('splitTabsWrap');
   btnToggleSplitType?.addEventListener('click', () => {
@@ -249,17 +372,20 @@ function setupEventListeners() {
     });
   });
 
-  document.getElementById('modalExpContext')?.addEventListener('change', (e) => {
+  document.getElementById('modalExpContext')?.addEventListener('change', () => {
     updateExpenseModalParticipants();
   });
 
   // Form Submissions
-  formAddExpense.addEventListener('submit', handleExpenseSubmit);
-  formSettleUp.addEventListener('submit', handleSettleSubmit);
-  formCreateGroup.addEventListener('submit', handleGroupSubmit);
-  formAddFriend.addEventListener('submit', handleFriendSubmit);
+  formLogin?.addEventListener('submit', handleLoginSubmit);
+  formSignup?.addEventListener('submit', handleSignupSubmit);
+  formProfile?.addEventListener('submit', handleProfileSubmit);
+  formAddExpense?.addEventListener('submit', handleExpenseSubmit);
+  formSettleUp?.addEventListener('submit', handleSettleSubmit);
+  formCreateGroup?.addEventListener('submit', handleGroupSubmit);
+  formAddFriend?.addEventListener('submit', handleFriendSubmit);
 
-  // Invite Button
+  // Invite Widget
   document.getElementById('btnSendInvite')?.addEventListener('click', () => {
     const input = document.getElementById('inviteEmailInput');
     if (input.value.trim()) {
@@ -269,55 +395,159 @@ function setupEventListeners() {
   });
 }
 
+// 1-Click Quick Demo Login
+window.quickFillLogin = function (email) {
+  const emailInput = document.getElementById('loginEmail');
+  const pwdInput = document.getElementById('loginPassword');
+  if (emailInput) emailInput.value = email;
+  if (pwdInput) pwdInput.value = 'password123';
+};
+
+window.quickLogin = async function (email) {
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: 'password123' }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Login failed');
+
+    authToken = data.data.token;
+    currentUser = data.data.user;
+    localStorage.setItem('splitwise_auth_token', authToken);
+
+    modalLogin?.classList.add('hidden');
+    showAuthenticatedUI();
+    await loadInitialData();
+  } catch (err) {
+    alert('Login error: ' + err.message);
+  }
+};
+
+// Form Handlers: Auth
+async function handleLoginSubmit(e) {
+  e.preventDefault();
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Invalid email or password');
+
+    authToken = data.data.token;
+    currentUser = data.data.user;
+    localStorage.setItem('splitwise_auth_token', authToken);
+
+    modalLogin.classList.add('hidden');
+    formLogin.reset();
+    showAuthenticatedUI();
+    await loadInitialData();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function handleSignupSubmit(e) {
+  e.preventDefault();
+  const name = document.getElementById('signupName').value.trim();
+  const email = document.getElementById('signupEmail').value.trim();
+  const password = document.getElementById('signupPassword').value;
+  const defaultCurrency = document.getElementById('signupCurrency').value;
+
+  try {
+    const res = await fetch('/api/auth/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email, password, defaultCurrency }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Signup failed');
+
+    authToken = data.data.token;
+    currentUser = data.data.user;
+    localStorage.setItem('splitwise_auth_token', authToken);
+
+    modalSignup.classList.add('hidden');
+    formSignup.reset();
+    showAuthenticatedUI();
+    await loadInitialData();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+function openProfileModal() {
+  if (!currentUser) return;
+  document.getElementById('profileName').value = currentUser.name;
+  document.getElementById('profileAvatar').value = currentUser.avatarUrl || '👤';
+  document.getElementById('profileCurrency').value = currentUser.defaultCurrency || 'INR';
+  document.getElementById('profileNewPassword').value = '';
+  modalProfile.classList.remove('hidden');
+}
+
+async function handleProfileSubmit(e) {
+  e.preventDefault();
+  const name = document.getElementById('profileName').value.trim();
+  const avatarUrl = document.getElementById('profileAvatar').value.trim();
+  const defaultCurrency = document.getElementById('profileCurrency').value;
+  const password = document.getElementById('profileNewPassword').value;
+
+  try {
+    const res = await authFetch('/api/auth/profile', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name,
+        avatarUrl,
+        defaultCurrency,
+        password: password ? password : undefined,
+      }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to update profile');
+
+    currentUser = data.data;
+    updateCurrentUserUI();
+    modalProfile.classList.add('hidden');
+    await reloadCurrentView();
+  } catch (err) {
+    alert('Error updating profile: ' + err.message);
+  }
+}
+
 // Initial Data Fetch
 async function loadInitialData() {
+  if (!currentUser) return;
+
   try {
     const [usersRes, groupsRes] = await Promise.all([
-      fetch('/api/users').then((r) => r.json()),
-      fetch('/api/groups').then((r) => r.json()),
+      authFetch('/api/users').then((r) => r.json()),
+      authFetch('/api/groups').then((r) => r.json()),
     ]);
 
     allUsers = usersRes.data || [];
     groups = groupsRes.data || [];
 
-    // Setup Current User
-    if (allUsers.length > 0) {
-      if (!currentUserId || !allUsers.some((u) => u.id === currentUserId)) {
-        currentUserId = allUsers[0].id;
-      }
-    }
-
-    // Populate Current User Selector
-    currentUserSelect.innerHTML = allUsers
-      .map((u) => `<option value="${u.id}">${u.avatarUrl || '👤'} ${u.name}</option>`)
-      .join('');
-    currentUserSelect.value = currentUserId;
-
-    updateCurrentUserUI();
-
-    // Fetch Friends for Current User
     await reloadFriends();
-
-    // Default to Dashboard
     await switchView('dashboard');
   } catch (err) {
     console.error('Error loading initial Splitwise data:', err);
   }
 }
 
-function updateCurrentUserUI() {
-  const user = allUsers.find((u) => u.id === currentUserId);
-  if (user) {
-    headerUserAvatar.innerText = user.avatarUrl || '👤';
-    headerUserName.innerText = user.name;
-    currentUserSelect.value = user.id;
-  }
-}
-
 async function reloadFriends() {
-  if (!currentUserId) return;
+  if (!currentUser) return;
   try {
-    const res = await fetch(`/api/friends?userId=${currentUserId}`).then((r) => r.json());
+    const res = await authFetch(`/api/friends?userId=${currentUser.id}`).then((r) => r.json());
     friends = res.data || [];
   } catch (err) {
     console.error('Error fetching friends:', err);
@@ -330,25 +560,28 @@ async function switchView(viewName, targetId = null) {
   activeGroupId = null;
   activeFriendId = null;
 
-  // Clear sidebar active highlights
   document.querySelectorAll('.sw-nav-item').forEach((n) => n.classList.remove('active'));
   document.querySelectorAll('.sw-list-item').forEach((l) => l.classList.remove('active'));
 
-  // Reset feed tab to expenses
+  // Default view display states
   feedTab = 'expenses';
   tabViewExpenses.classList.add('active');
   tabViewSimplification.classList.remove('active');
   expensesFeed.classList.remove('hidden');
+  activitiesFeed.classList.add('hidden');
   simplificationFeed.classList.add('hidden');
   simplificationToggles.classList.add('hidden');
+  feedSubheader.classList.remove('hidden');
 
   if (viewName === 'dashboard') {
     navDashboard.classList.add('active');
     await loadDashboardView();
-  } else if (viewName === 'activity' || viewName === 'expenses') {
-    if (viewName === 'activity') navRecentActivity.classList.add('active');
-    else navAllExpenses.classList.add('active');
-    await loadAllExpensesView(viewName);
+  } else if (viewName === 'activity') {
+    navRecentActivity.classList.add('active');
+    await loadRecentActivityView();
+  } else if (viewName === 'expenses') {
+    navAllExpenses.classList.add('active');
+    await loadAllExpensesView();
   } else if (viewName === 'group') {
     activeGroupId = targetId;
     activeGroup = groups.find((g) => g.id === targetId) || null;
@@ -384,11 +617,9 @@ async function loadDashboardView() {
   centerSubtitle.innerText = 'Overall balance and recent activity';
   tabViewSimplification.classList.add('hidden');
 
-  // Fetch all user expenses
-  const allExpRes = await fetch('/api/expenses').then((r) => r.json());
+  const allExpRes = await authFetch('/api/expenses').then((r) => r.json());
   currentExpenses = allExpRes.data || [];
 
-  // Compute Overall Balances across all friends
   let totalYouAreOwed = 0;
   let totalYouOwe = 0;
   let oweCount = 0;
@@ -430,21 +661,78 @@ async function loadDashboardView() {
   renderDashboardRightSidebar(netTotal, totalYouOwe, totalYouAreOwed);
 }
 
-// 2. All Expenses View
-async function loadAllExpensesView(mode = 'expenses') {
-  topbarViewIcon.innerText = mode === 'activity' ? '⚡' : '📜';
-  centerTitle.innerText = mode === 'activity' ? 'Recent activity' : 'All expenses';
+// 2. Recent Activity View (Audit Stream)
+async function loadRecentActivityView() {
+  topbarViewIcon.innerText = '⚡';
+  centerTitle.innerText = 'Recent activity';
+  centerSubtitle.innerText = 'Live chronological audit stream of all activity';
+
+  feedSubheader.classList.add('hidden');
+  expensesFeed.classList.add('hidden');
+  activitiesFeed.classList.remove('hidden');
+
+  ribbonTotalBalance.innerText = '⚡ Activity';
+  ribbonTotalBalanceSub.innerText = 'live event logging';
+  ribbonYouOwe.innerText = `${friends.length} friends`;
+  ribbonYouOweSub.innerText = 'network';
+  ribbonYouAreOwed.innerText = `${groups.length} groups`;
+  ribbonYouAreOwedSub.innerText = 'active ledgers';
+
+  try {
+    const res = await authFetch('/api/activities').then((r) => r.json());
+    const activities = res.data || [];
+
+    if (activities.length === 0) {
+      activitiesFeed.innerHTML = `
+        <div class="sw-empty-state">
+          <div class="sw-empty-icon">📭</div>
+          <h3>No activity recorded yet</h3>
+        </div>
+      `;
+      return;
+    }
+
+    activitiesFeed.innerHTML = activities
+      .map((a) => {
+        let icon = '📝';
+        if (a.type === 'expense_created') icon = '💸';
+        if (a.type === 'settlement') icon = '🤝';
+        if (a.type === 'comment') icon = '💬';
+        if (a.type === 'group_created') icon = '👥';
+
+        return `
+          <div class="sw-activity-row">
+            <div class="sw-activity-avatar">${a.userAvatar || icon}</div>
+            <div class="sw-activity-body">
+              <span class="sw-activity-desc">${a.description}</span>
+              <span class="sw-activity-meta">${formatTimeAgo(a.createdAt)} ${a.groupName ? `• in <strong>${a.groupName}</strong>` : ''}</span>
+            </div>
+          </div>
+        `;
+      })
+      .join('');
+  } catch (err) {
+    activitiesFeed.innerHTML = `<div class="sw-empty-state"><p>Error loading activity.</p></div>`;
+  }
+
+  renderDashboardRightSidebar(0, 0, 0);
+}
+
+// 3. All Expenses View
+async function loadAllExpensesView() {
+  topbarViewIcon.innerText = '📜';
+  centerTitle.innerText = 'All expenses';
   centerSubtitle.innerText = 'Complete timeline of bills and payments';
   tabViewSimplification.classList.add('hidden');
 
-  const allExpRes = await fetch('/api/expenses').then((r) => r.json());
+  const allExpRes = await authFetch('/api/expenses').then((r) => r.json());
   currentExpenses = allExpRes.data || [];
 
   renderExpensesFeed();
   renderDashboardRightSidebar(0, 0, 0);
 }
 
-// 3. Group View
+// 4. Group View
 async function loadGroupView() {
   if (!activeGroup) return;
 
@@ -455,15 +743,14 @@ async function loadGroupView() {
 
   try {
     const [expRes, settleRes] = await Promise.all([
-      fetch(`/api/groups/${activeGroup.id}/expenses`).then((r) => r.json()),
-      fetch(`/api/groups/${activeGroup.id}/settlement`).then((r) => r.json()),
+      authFetch(`/api/groups/${activeGroup.id}/expenses`).then((r) => r.json()),
+      authFetch(`/api/groups/${activeGroup.id}/settlement`).then((r) => r.json()),
     ]);
 
     currentExpenses = expRes.data || [];
     groupSettlement = settleRes.data || null;
 
-    // Calculate user's net position in this group
-    const myBalanceObj = groupSettlement?.netBalances?.find((b) => b.userId === currentUserId);
+    const myBalanceObj = groupSettlement?.netBalances?.find((b) => b.userId === currentUser.id);
     const myNetInGroup = myBalanceObj ? myBalanceObj.balance : 0;
 
     if (Math.abs(myNetInGroup) < 0.005) {
@@ -495,7 +782,7 @@ async function loadGroupView() {
   }
 }
 
-// 4. Friend View
+// 5. Friend View
 async function loadFriendView() {
   if (!activeFriend) return;
 
@@ -505,7 +792,7 @@ async function loadFriendView() {
   tabViewSimplification.classList.add('hidden');
 
   try {
-    const expRes = await fetch(`/api/friends/${activeFriend.friend.id}/expenses?userId=${currentUserId}`).then((r) =>
+    const expRes = await authFetch(`/api/friends/${activeFriend.friend.id}/expenses?userId=${currentUser.id}`).then((r) =>
       r.json()
     );
     currentExpenses = expRes.data || [];
@@ -541,7 +828,6 @@ async function loadFriendView() {
 
 // Render Left Sidebar (Groups & Friends lists)
 function renderLeftSidebar() {
-  // Groups List
   sidebarGroupsList.innerHTML = groups
     .map(
       (g) => `
@@ -557,7 +843,6 @@ function renderLeftSidebar() {
     )
     .join('');
 
-  // Friends List with Balance indicator
   sidebarFriendsList.innerHTML = friends
     .map((f) => {
       const isSelected = currentView === 'friend' && activeFriendId === f.friend.id;
@@ -603,19 +888,17 @@ function renderExpensesFeed() {
       const icon = CATEGORY_ICONS[exp.category] || '🛒';
       const isPayment = exp.category === 'Payment';
 
-      // Payer description string
-      const isYouPayer = exp.payers.some((p) => p.userId === currentUserId);
+      const isYouPayer = exp.payers.some((p) => p.userId === currentUser?.id);
       const payerNames = exp.payers
         .map((p) => {
-          if (p.userId === currentUserId) return 'you';
+          if (p.userId === currentUser?.id) return 'you';
           const u = allUsers.find((user) => user.id === p.userId);
           return u ? u.name : p.userId;
         })
         .join(', ');
 
-      // Split impact on current user
-      const userSplit = exp.splits.find((s) => s.userId === currentUserId);
-      const userPaidObj = exp.payers.find((p) => p.userId === currentUserId);
+      const userSplit = exp.splits.find((s) => s.userId === currentUser?.id);
+      const userPaidObj = exp.payers.find((p) => p.userId === currentUser?.id);
       const userPaidAmt = userPaidObj ? userPaidObj.amount : 0;
       const userOwedAmt = userSplit ? userSplit.amount : 0;
       const netImpact = userPaidAmt - userOwedAmt;
@@ -692,7 +975,6 @@ function renderExpensesFeed() {
             </div>
           </div>
 
-          <!-- Expanded Detail & Comments Section -->
           <div class="sw-expense-detail-view hidden" id="exp-detail-${exp.id}">
             <div class="sw-detail-breakdown">
               <div class="sw-detail-item" style="margin-bottom:8px;">
@@ -701,7 +983,7 @@ function renderExpensesFeed() {
               ${exp.splits
                 .map((s) => {
                   const u = allUsers.find((user) => user.id === s.userId);
-                  const name = s.userId === currentUserId ? 'You' : u ? u.name : s.userId;
+                  const name = s.userId === currentUser?.id ? 'You' : u ? u.name : s.userId;
                   return `
                   <div class="sw-detail-item">
                     <span>${u?.avatarUrl || '👤'}</span>
@@ -712,7 +994,6 @@ function renderExpensesFeed() {
                 .join('')}
             </div>
 
-            <!-- Comments Section -->
             <div class="sw-comments-section">
               <div class="sw-comments-title">COMMENTS</div>
               <div class="sw-comments-list" id="comments-list-${exp.id}">
@@ -730,7 +1011,7 @@ function renderExpensesFeed() {
     .join('');
 }
 
-// Toggle Expense Details Dropdown
+// Toggle Expense Details
 window.toggleExpenseDetails = async function (expenseId) {
   const detailEl = document.getElementById(`exp-detail-${expenseId}`);
   if (!detailEl) return;
@@ -744,13 +1025,12 @@ window.toggleExpenseDetails = async function (expenseId) {
   }
 };
 
-// Comments
 async function loadExpenseComments(expenseId) {
   const container = document.getElementById(`comments-list-${expenseId}`);
   if (!container) return;
 
   try {
-    const res = await fetch(`/api/expenses/${expenseId}/comments`).then((r) => r.json());
+    const res = await authFetch(`/api/expenses/${expenseId}/comments`).then((r) => r.json());
     const comments = res.data || [];
 
     if (comments.length === 0) {
@@ -785,10 +1065,10 @@ window.handleCommentSubmit = async function (e, expenseId) {
   if (!input || !input.value.trim()) return;
 
   try {
-    const res = await fetch(`/api/expenses/${expenseId}/comments`, {
+    const res = await authFetch(`/api/expenses/${expenseId}/comments`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: currentUserId, content: input.value.trim() }),
+      body: JSON.stringify({ userId: currentUser.id, content: input.value.trim() }),
     });
 
     if (!res.ok) throw new Error('Failed to post comment');
@@ -829,8 +1109,8 @@ function renderSimplificationFeed() {
     .map((d) => {
       const fromUserObj = allUsers.find((u) => u.id === d.fromUser);
       const toUserObj = allUsers.find((u) => u.id === d.toUser);
-      const isFromMe = d.fromUser === currentUserId;
-      const isToMe = d.toUser === currentUserId;
+      const isFromMe = d.fromUser === currentUser?.id;
+      const isToMe = d.toUser === currentUser?.id;
 
       return `
         <div class="sw-transfer-card">
@@ -853,7 +1133,7 @@ function renderSimplificationFeed() {
     .join('');
 }
 
-// 5. Right Sidebar Renderers
+// Right Sidebar Renderers
 function renderDashboardRightSidebar(netTotal, totalYouOwe, totalYouAreOwed) {
   const owesYouList = friends.filter((f) => f.netBalance > 0.005);
   const youOweList = friends.filter((f) => f.netBalance < -0.005);
@@ -946,7 +1226,7 @@ function renderGroupRightSidebar() {
         ${groupSettlement.netBalances
           .map((b) => {
             const user = allUsers.find((u) => u.id === b.userId);
-            const isMe = b.userId === currentUserId;
+            const isMe = b.userId === currentUser?.id;
             let valClass = 'color:#888';
             let valText = 'settled';
 
@@ -1010,7 +1290,7 @@ function renderFriendRightSidebar() {
     statusMarkup = `
       <div class="sw-right-header text-teal">${activeFriend.friend.name.toUpperCase()} OWES YOU</div>
       <div class="sw-right-big-balance text-teal">+${formatCurrency(bal)}</div>
-      <button class="sw-btn-primary-teal" style="width:100%; margin-top:8px;" onclick="openSettleModal('${activeFriend.friend.id}', '${currentUserId}', ${bal})">
+      <button class="sw-btn-primary-teal" style="width:100%; margin-top:8px;" onclick="openSettleModal('${activeFriend.friend.id}', '${currentUser.id}', ${bal})">
         Settle up
       </button>
     `;
@@ -1018,7 +1298,7 @@ function renderFriendRightSidebar() {
     statusMarkup = `
       <div class="sw-right-header text-orange">YOU OWE ${activeFriend.friend.name.toUpperCase()}</div>
       <div class="sw-right-big-balance text-orange">-${formatCurrency(Math.abs(bal))}</div>
-      <button class="sw-btn-primary-orange" style="width:100%; margin-top:8px;" onclick="openSettleModal('${currentUserId}', '${activeFriend.friend.id}', ${Math.abs(bal)})">
+      <button class="sw-btn-primary-orange" style="width:100%; margin-top:8px;" onclick="openSettleModal('${currentUser.id}', '${activeFriend.friend.id}', ${Math.abs(bal)})">
         Settle up
       </button>
     `;
@@ -1032,11 +1312,10 @@ function renderFriendRightSidebar() {
   `;
 }
 
-// 6. Modals
+// Modals Setup & Openers
 function openExpenseModal() {
   const contextSelect = document.getElementById('modalExpContext');
 
-  // Populate groups and friends
   let options = '';
   options += `<optgroup label="Groups">`;
   options += groups.map((g) => `<option value="group:${g.id}">🌴 ${g.name}</option>`).join('');
@@ -1054,9 +1333,7 @@ function openExpenseModal() {
     contextSelect.value = `friend:${activeFriendId}`;
   }
 
-  // Set date to today
   document.getElementById('expDate').value = new Date().toISOString().split('T')[0];
-
   updateExpenseModalParticipants();
   modalAddExpense.classList.remove('hidden');
 }
@@ -1072,12 +1349,14 @@ function updateExpenseModalParticipants() {
     participants = grp ? grp.members : allUsers;
   } else {
     const fr = friends.find((f) => f.friend.id === id);
-    const me = allUsers.find((u) => u.id === currentUserId);
+    const me = allUsers.find((u) => u.id === currentUser?.id);
     participants = [me, fr?.friend].filter(Boolean);
   }
 
-  payerSelect.innerHTML = participants.map((p) => `<option value="${p.id}">${p.id === currentUserId ? 'You' : p.name}</option>`).join('');
-  payerSelect.value = currentUserId;
+  payerSelect.innerHTML = participants
+    .map((p) => `<option value="${p.id}">${p.id === currentUser?.id ? 'You' : p.name}</option>`)
+    .join('');
+  if (currentUser) payerSelect.value = currentUser.id;
 
   const splitType = document.getElementById('activeSplitType').value || 'EQUAL';
   renderParticipantSplitRows(splitType, participants);
@@ -1095,7 +1374,7 @@ function renderParticipantSplitRows(splitType, userList = null) {
       participants = grp ? grp.members : allUsers;
     } else {
       const fr = friends.find((f) => f.friend.id === id);
-      const me = allUsers.find((u) => u.id === currentUserId);
+      const me = allUsers.find((u) => u.id === currentUser?.id);
       participants = [me, fr?.friend].filter(Boolean);
     }
   }
@@ -1115,7 +1394,7 @@ function renderParticipantSplitRows(splitType, userList = null) {
         <div class="sw-split-user-row">
           <label style="display:flex; align-items:center; gap:8px;">
             <input type="checkbox" class="sw-modal-user-cb" value="${p.id}" checked>
-            <span>${p.avatarUrl || '👤'} ${p.id === currentUserId ? 'You' : p.name}</span>
+            <span>${p.avatarUrl || '👤'} ${p.id === currentUser?.id ? 'You' : p.name}</span>
           </label>
           ${customInput}
         </div>
@@ -1131,13 +1410,15 @@ function openSettleModal(fromId = null, toId = null, amount = null) {
   const dateInput = document.getElementById('settleDate');
 
   let memberList = currentView === 'group' && activeGroup ? activeGroup.members : allUsers;
-  const options = memberList.map((m) => `<option value="${m.id}">${m.id === currentUserId ? 'You' : m.name}</option>`).join('');
+  const options = memberList
+    .map((m) => `<option value="${m.id}">${m.id === currentUser?.id ? 'You' : m.name}</option>`)
+    .join('');
 
   payerSelect.innerHTML = options;
   receiverSelect.innerHTML = options;
 
   if (fromId) payerSelect.value = fromId;
-  else payerSelect.value = currentUserId;
+  else if (currentUser) payerSelect.value = currentUser.id;
 
   if (toId) receiverSelect.value = toId;
   else if (memberList.length > 1) {
@@ -1148,7 +1429,6 @@ function openSettleModal(fromId = null, toId = null, amount = null) {
   else amountInput.value = '';
 
   dateInput.value = new Date().toISOString().split('T')[0];
-
   modalSettleUp.classList.remove('hidden');
 }
 
@@ -1171,7 +1451,7 @@ function openGroupModal() {
 function openFriendModal() {
   const select = document.getElementById('newFriendSelect');
   const friendIdSet = new Set(friends.map((f) => f.friend.id));
-  friendIdSet.add(currentUserId);
+  if (currentUser) friendIdSet.add(currentUser.id);
 
   const nonFriends = allUsers.filter((u) => !friendIdSet.has(u.id));
   if (nonFriends.length === 0) {
@@ -1183,7 +1463,7 @@ function openFriendModal() {
   modalAddFriend.classList.remove('hidden');
 }
 
-// 7. Form Handlers
+// Expense & Group Submit Handlers
 async function handleExpenseSubmit(e) {
   e.preventDefault();
   const contextVal = document.getElementById('modalExpContext').value;
@@ -1215,7 +1495,7 @@ async function handleExpenseSubmit(e) {
   const endpoint = contextType === 'group' ? `/api/groups/${contextId}/expenses` : '/api/expenses';
 
   try {
-    const res = await fetch(endpoint, {
+    const res = await authFetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1262,7 +1542,7 @@ async function handleSettleSubmit(e) {
   const groupId = currentView === 'group' && activeGroup ? activeGroup.id : '0';
 
   try {
-    const res = await fetch(`/api/groups/${groupId}/settle`, {
+    const res = await authFetch(`/api/groups/${groupId}/settle`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1292,7 +1572,7 @@ async function handleGroupSubmit(e) {
   const memberIds = Array.from(document.querySelectorAll('.sw-group-member-cb:checked')).map((cb) => cb.value);
 
   try {
-    const res = await fetch('/api/groups', {
+    const res = await authFetch('/api/groups', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, description: desc, currency, memberIds }),
@@ -1304,8 +1584,7 @@ async function handleGroupSubmit(e) {
     modalCreateGroup.classList.add('hidden');
     formCreateGroup.reset();
 
-    // Reload groups and navigate to new group
-    const groupsRes = await fetch('/api/groups').then((r) => r.json());
+    const groupsRes = await authFetch('/api/groups').then((r) => r.json());
     groups = groupsRes.data || [];
     await switchView('group', data.data.id);
   } catch (err) {
@@ -1318,10 +1597,10 @@ async function handleFriendSubmit(e) {
   const friendId = document.getElementById('newFriendSelect').value;
 
   try {
-    const res = await fetch('/api/friends', {
+    const res = await authFetch('/api/friends', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId1: currentUserId, userId2: friendId }),
+      body: JSON.stringify({ userId1: currentUser.id, userId2: friendId }),
     });
 
     const data = await res.json();
@@ -1339,7 +1618,7 @@ async function handleFriendSubmit(e) {
 window.deleteExpense = async function (id) {
   if (!confirm('Are you sure you want to delete this expense? This cannot be undone.')) return;
   try {
-    const res = await fetch(`/api/expenses/${id}`, { method: 'DELETE' });
+    const res = await authFetch(`/api/expenses/${id}`, { method: 'DELETE' });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to delete expense');
     await reloadCurrentView();

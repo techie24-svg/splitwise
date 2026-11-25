@@ -45,6 +45,141 @@ function getUserMap() {
   return map;
 }
 
+// Auth Helper: extract token from Bearer header or query parameter
+function getAuthToken(req: express.Request): string | null {
+  const header = req.headers.authorization;
+  if (header && header.startsWith('Bearer ')) {
+    return header.slice(7).trim();
+  }
+  if (req.query.token && typeof req.query.token === 'string') {
+    return req.query.token;
+  }
+  return null;
+}
+
+// ==========================================
+// Authentication Routes (Prod Ready)
+// ==========================================
+app.post(['/api/auth/register', '/api/auth/signup'], (req, res) => {
+  try {
+    const { name, email, password, defaultCurrency, avatarUrl } = req.body;
+    if (!name || typeof name !== 'string' || !name.trim()) {
+      return res.status(400).json({ success: false, error: 'Full name is required' });
+    }
+    if (!email || typeof email !== 'string' || !email.includes('@')) {
+      return res.status(400).json({ success: false, error: 'Valid email address is required' });
+    }
+    if (password && password.length < 6) {
+      return res.status(400).json({ success: false, error: 'Password must be at least 6 characters' });
+    }
+
+    // Check if email already registered
+    const existing = db.getUsers().find((u) => u.email?.toLowerCase() === email.toLowerCase());
+    if (existing) {
+      return res.status(400).json({ success: false, error: 'An account with this email already exists. Please log in.' });
+    }
+
+    const { user, token } = db.registerUser({
+      name: name.trim(),
+      email: email.trim(),
+      password: password || 'password123',
+      defaultCurrency: defaultCurrency || 'INR',
+      avatarUrl: avatarUrl || '👤',
+    });
+
+    res.status(201).json({ success: true, data: { user, token } });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/auth/login', (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ success: false, error: 'Email and password are required' });
+    }
+
+    const result = db.loginUser(email.trim(), password);
+    if (!result) {
+      return res.status(401).json({ success: false, error: 'Invalid email or password' });
+    }
+
+    res.json({ success: true, data: result });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get('/api/auth/me', (req, res) => {
+  try {
+    const token = getAuthToken(req);
+    if (!token) {
+      return res.status(401).json({ success: false, error: 'Missing authentication token' });
+    }
+
+    const user = db.getSessionUser(token);
+    if (!user) {
+      return res.status(401).json({ success: false, error: 'Session expired or invalid' });
+    }
+
+    res.json({ success: true, data: user });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/auth/logout', (req, res) => {
+  try {
+    const token = getAuthToken(req);
+    if (token) {
+      db.deleteSession(token);
+    }
+    res.json({ success: true, message: 'Logged out successfully' });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.put('/api/auth/profile', (req, res) => {
+  try {
+    const token = getAuthToken(req);
+    if (!token) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+
+    const sessionUser = db.getSessionUser(token);
+    if (!sessionUser) {
+      return res.status(401).json({ success: false, error: 'Session expired' });
+    }
+
+    const { name, avatarUrl, defaultCurrency, password } = req.body;
+    const updatedUser = db.updateUserProfile(sessionUser.id, {
+      name,
+      avatarUrl,
+      defaultCurrency,
+      password,
+    });
+
+    res.json({ success: true, data: updatedUser });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ==========================================
+// Activities / Audit Log
+// ==========================================
+app.get('/api/activities', (req, res) => {
+  try {
+    const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 50;
+    const activities = db.getActivities(limit);
+    res.json({ success: true, data: activities });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // ==========================================
 // User Routes
 // ==========================================
@@ -59,11 +194,11 @@ app.get('/api/users', (req, res) => {
 
 app.post('/api/users', (req, res) => {
   try {
-    const { name, email, avatarUrl } = req.body;
+    const { name, email, avatarUrl, defaultCurrency } = req.body;
     if (!name || typeof name !== 'string') {
       return res.status(400).json({ success: false, error: 'Name is required' });
     }
-    const user = db.createUser({ name, email, avatarUrl });
+    const user = db.createUser({ name, email, avatarUrl, defaultCurrency });
     res.status(201).json({ success: true, data: user });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
@@ -89,6 +224,18 @@ app.post('/api/groups', (req, res) => {
       return res.status(400).json({ success: false, error: 'Group name is required' });
     }
     const group = db.createGroup({ name, description, currency, memberIds });
+
+    // Log activity
+    const creatorId = memberIds && memberIds.length > 0 ? memberIds[0] : db.getUsers()[0]?.id;
+    if (creatorId) {
+      db.logActivity({
+        userId: creatorId,
+        groupId: group.id,
+        type: 'group_created',
+        description: `Created group "${group.name}"`,
+      });
+    }
+
     res.status(201).json({ success: true, data: group });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
@@ -102,6 +249,17 @@ app.get('/api/groups/:id', (req, res) => {
       return res.status(404).json({ success: false, error: 'Group not found' });
     }
     res.json({ success: true, data: group });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get('/api/groups/:id/export.csv', (req, res) => {
+  try {
+    const csvData = db.exportGroupExpensesCSV(req.params.id);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="splitwise-group-${req.params.id}.csv"`);
+    res.send(csvData);
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -124,6 +282,15 @@ app.post('/api/groups/:id/members', (req, res) => {
 // ==========================================
 // Expense Routes
 // ==========================================
+app.get('/api/expenses', (req, res) => {
+  try {
+    const expenses = db.getAllExpenses();
+    res.json({ success: true, data: expenses });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 app.get('/api/groups/:id/expenses', (req, res) => {
   try {
     const expenses = db.getGroupExpenses(req.params.id);
@@ -182,6 +349,16 @@ function handleCreateExpense(req: any, res: any, forcedGroupId?: string) {
       splits: calculatedSplits,
     });
 
+    // Log Activity
+    const payerName = db.getUserById(payers[0].userId)?.name || 'Someone';
+    const currSym = (currency || 'INR') === 'INR' ? '₹' : (currency || 'INR') + ' ';
+    db.logActivity({
+      userId: payers[0].userId,
+      groupId: groupId || undefined,
+      type: 'expense_created',
+      description: `${payerName} added "${description}" (${currSym}${Number(totalAmount).toFixed(2)})`,
+    });
+
     res.status(201).json({ success: true, data: expense });
   } catch (err: any) {
     res.status(400).json({ success: false, error: err.message });
@@ -198,10 +375,24 @@ app.post('/api/expenses', (req, res) => {
 
 app.delete('/api/expenses/:id', (req, res) => {
   try {
-    const ok = db.deleteExpense(req.params.id);
-    if (!ok) {
+    const expense = db.getExpenseById(req.params.id);
+    if (!expense) {
       return res.status(404).json({ success: false, error: 'Expense not found' });
     }
+
+    db.deleteExpense(req.params.id);
+
+    // Log activity
+    const firstPayer = expense.payers[0]?.userId || db.getUsers()[0]?.id;
+    if (firstPayer) {
+      db.logActivity({
+        userId: firstPayer,
+        groupId: expense.groupId,
+        type: 'expense_deleted',
+        description: `Deleted expense "${expense.description}"`,
+      });
+    }
+
     res.json({ success: true, message: 'Expense deleted successfully' });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
@@ -283,7 +474,7 @@ app.post('/api/groups/:id/settle', (req, res) => {
       });
     }
 
-    const expense = db.recordSettlement(groupId, fromUserId, toUserId, Number(amount), currency);
+    const expense = db.recordSettlement(groupId === '0' ? undefined : groupId, fromUserId, toUserId, Number(amount), currency);
     res.status(201).json({ success: true, data: expense });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
@@ -361,6 +552,19 @@ app.post('/api/expenses/:id/comments', (req, res) => {
       return res.status(400).json({ success: false, error: 'userId and non-empty content are required' });
     }
     const comment = db.addComment(expenseId, userId, content.trim());
+
+    // Log Activity
+    const expense = db.getExpenseById(expenseId);
+    const user = db.getUserById(userId);
+    if (expense && user) {
+      db.logActivity({
+        userId,
+        groupId: expense.groupId,
+        type: 'comment',
+        description: `${user.name} commented on "${expense.description}"`,
+      });
+    }
+
     res.status(201).json({ success: true, data: comment });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
@@ -391,7 +595,6 @@ app.post('/api/seed', (req, res) => {
 
 // Start Server
 if (process.argv[1]?.endsWith('server.ts')) {
-  // If database is empty, seed it automatically
   if (db.getGroups().length === 0) {
     console.log('Database is empty. Populating initial seed data...');
     seedDatabase();

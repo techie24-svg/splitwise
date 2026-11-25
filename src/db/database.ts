@@ -1,6 +1,6 @@
 import { DatabaseSync } from 'node:sqlite';
-import { randomUUID } from 'node:crypto';
-import type { User, Group, Expense, Payer, SplitItem, SplitType, Comment, FriendBalance } from '../models/types.ts';
+import { randomUUID, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
+import type { User, Group, Expense, Payer, SplitItem, SplitType, Comment, FriendBalance, Activity, Session } from '../models/types.ts';
 
 export class SplitwiseDB {
   private db: DatabaseSync;
@@ -19,8 +19,27 @@ export class SplitwiseDB {
       CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
-        email TEXT,
+        email TEXT UNIQUE,
+        password_hash TEXT,
+        salt TEXT,
         avatar_url TEXT,
+        default_currency TEXT NOT NULL DEFAULT 'INR',
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
+      CREATE TABLE IF NOT EXISTS sessions (
+        token TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        expires_at TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
+      CREATE TABLE IF NOT EXISTS activities (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        group_id TEXT,
+        type TEXT NOT NULL,
+        description TEXT NOT NULL,
         created_at TEXT NOT NULL DEFAULT (datetime('now'))
       );
 
@@ -82,41 +101,207 @@ export class SplitwiseDB {
         created_at TEXT NOT NULL DEFAULT (datetime('now'))
       );
     `);
+
+    // Safe column migrations for existing databases
+    try {
+      this.db.exec('ALTER TABLE users ADD COLUMN password_hash TEXT;');
+    } catch {}
+    try {
+      this.db.exec('ALTER TABLE users ADD COLUMN salt TEXT;');
+    } catch {}
+    try {
+      this.db.exec("ALTER TABLE users ADD COLUMN default_currency TEXT NOT NULL DEFAULT 'INR';");
+    } catch {}
   }
 
-  // --- Users ---
-  public createUser(user: { id?: string; name: string; email?: string; avatarUrl?: string }): User {
+  // --- Password Hashing Helpers ---
+  private hashPassword(password: string, salt: string): string {
+    return scryptSync(password, salt, 64).toString('hex');
+  }
+
+  // --- Authentication & Users ---
+  public registerUser(data: {
+    id?: string;
+    name: string;
+    email: string;
+    password?: string;
+    avatarUrl?: string;
+    defaultCurrency?: string;
+  }): { user: User; token: string } {
+    const id = data.id || randomUUID();
+    const salt = randomBytes(16).toString('hex');
+    const password = data.password || 'password123';
+    const passwordHash = this.hashPassword(password, salt);
+    const defaultCurrency = data.defaultCurrency || 'INR';
+    const avatarUrl = data.avatarUrl || '👤';
+
+    const stmt = this.db.prepare(`
+      INSERT INTO users (id, name, email, password_hash, salt, avatar_url, default_currency)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+      RETURNING id, name, email, avatar_url, default_currency
+    `);
+
+    const row = stmt.get(id, data.name, data.email.toLowerCase(), passwordHash, salt, avatarUrl, defaultCurrency) as any;
+
+    const user: User = {
+      id: row.id,
+      name: row.name,
+      email: row.email,
+      avatarUrl: row.avatar_url,
+      defaultCurrency: row.default_currency,
+    };
+
+    const token = this.createSession(user.id);
+    this.logActivity({
+      userId: user.id,
+      type: 'user_joined',
+      description: `${user.name} joined Splitwise!`,
+    });
+
+    return { user, token };
+  }
+
+  public loginUser(email: string, password: string): { user: User; token: string } | null {
+    const row = this.db.prepare(`
+      SELECT id, name, email, password_hash, salt, avatar_url, default_currency
+      FROM users
+      WHERE lower(email) = lower(?)
+    `).get(email) as any;
+
+    if (!row || !row.password_hash || !row.salt) {
+      return null;
+    }
+
+    const computedHash = this.hashPassword(password, row.salt);
+    const valid = timingSafeEqual(Buffer.from(computedHash, 'hex'), Buffer.from(row.password_hash, 'hex'));
+    if (!valid) {
+      return null;
+    }
+
+    const user: User = {
+      id: row.id,
+      name: row.name,
+      email: row.email,
+      avatarUrl: row.avatar_url,
+      defaultCurrency: row.default_currency,
+    };
+
+    const token = this.createSession(user.id);
+    return { user, token };
+  }
+
+  public createSession(userId: string): string {
+    const token = randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+    this.db.prepare(`
+      INSERT INTO sessions (token, user_id, expires_at)
+      VALUES (?, ?, ?)
+    `).run(token, userId, expiresAt.toISOString());
+    return token;
+  }
+
+  public getSessionUser(token: string): User | null {
+    if (!token) return null;
+    const row = this.db.prepare(`
+      SELECT u.id, u.name, u.email, u.avatar_url, u.default_currency, s.expires_at
+      FROM sessions s
+      JOIN users u ON s.user_id = u.id
+      WHERE s.token = ?
+    `).get(token) as any;
+
+    if (!row) return null;
+
+    if (new Date(row.expires_at) < new Date()) {
+      this.deleteSession(token);
+      return null;
+    }
+
+    return {
+      id: row.id,
+      name: row.name,
+      email: row.email,
+      avatarUrl: row.avatar_url,
+      defaultCurrency: row.default_currency,
+    };
+  }
+
+  public deleteSession(token: string): void {
+    this.db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
+  }
+
+  public updateUserProfile(
+    userId: string,
+    data: { name?: string; avatarUrl?: string; defaultCurrency?: string; password?: string }
+  ): User {
+    const user = this.getUserById(userId);
+    if (!user) throw new Error('User not found');
+
+    const name = data.name || user.name;
+    const avatarUrl = data.avatarUrl || user.avatarUrl;
+    const defaultCurrency = data.defaultCurrency || user.defaultCurrency || 'INR';
+
+    if (data.password) {
+      const salt = randomBytes(16).toString('hex');
+      const passwordHash = this.hashPassword(data.password, salt);
+      this.db.prepare(`
+        UPDATE users
+        SET name = ?, avatar_url = ?, default_currency = ?, password_hash = ?, salt = ?
+        WHERE id = ?
+      `).run(name, avatarUrl || null, defaultCurrency, passwordHash, salt, userId);
+    } else {
+      this.db.prepare(`
+        UPDATE users
+        SET name = ?, avatar_url = ?, default_currency = ?
+        WHERE id = ?
+      `).run(name, avatarUrl || null, defaultCurrency, userId);
+    }
+
+    return this.getUserById(userId)!;
+  }
+
+  // Backwards-compatible simple user creation
+  public createUser(user: { id?: string; name: string; email?: string; avatarUrl?: string; defaultCurrency?: string; password?: string }): User {
     const id = user.id || randomUUID();
-    const stmt = this.db.prepare(
-      'INSERT INTO users (id, name, email, avatar_url) VALUES (?, ?, ?, ?) RETURNING id, name, email, avatar_url'
-    );
-    const row = stmt.get(id, user.name, user.email || null, user.avatarUrl || null) as any;
+    const email = user.email ? user.email.toLowerCase() : `${id}@example.com`;
+    const salt = randomBytes(16).toString('hex');
+    const passwordHash = this.hashPassword(user.password || 'password123', salt);
+    const defaultCurrency = user.defaultCurrency || 'INR';
+
+    const stmt = this.db.prepare(`
+      INSERT INTO users (id, name, email, password_hash, salt, avatar_url, default_currency)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+      RETURNING id, name, email, avatar_url, default_currency
+    `);
+    const row = stmt.get(id, user.name, email, passwordHash, salt, user.avatarUrl || '👤', defaultCurrency) as any;
     return {
       id: row.id,
       name: row.name,
       email: row.email || undefined,
       avatarUrl: row.avatar_url || undefined,
+      defaultCurrency: row.default_currency,
     };
   }
 
   public getUsers(): User[] {
-    const rows = this.db.prepare('SELECT id, name, email, avatar_url FROM users ORDER BY name ASC').all() as any[];
+    const rows = this.db.prepare('SELECT id, name, email, avatar_url, default_currency FROM users ORDER BY name ASC').all() as any[];
     return rows.map((r) => ({
       id: r.id,
       name: r.name,
       email: r.email || undefined,
       avatarUrl: r.avatar_url || undefined,
+      defaultCurrency: r.default_currency || 'INR',
     }));
   }
 
   public getUserById(id: string): User | null {
-    const row = this.db.prepare('SELECT id, name, email, avatar_url FROM users WHERE id = ?').get(id) as any;
+    const row = this.db.prepare('SELECT id, name, email, avatar_url, default_currency FROM users WHERE id = ?').get(id) as any;
     if (!row) return null;
     return {
       id: row.id,
       name: row.name,
       email: row.email || undefined,
       avatarUrl: row.avatar_url || undefined,
+      defaultCurrency: row.default_currency || 'INR',
     };
   }
 
@@ -159,7 +344,7 @@ export class SplitwiseDB {
 
   public getGroupMembers(groupId: string): User[] {
     const rows = this.db.prepare(`
-      SELECT u.id, u.name, u.email, u.avatar_url
+      SELECT u.id, u.name, u.email, u.avatar_url, u.default_currency
       FROM users u
       JOIN group_members gm ON u.id = gm.user_id
       WHERE gm.group_id = ?
@@ -171,6 +356,7 @@ export class SplitwiseDB {
       name: r.name,
       email: r.email || undefined,
       avatarUrl: r.avatar_url || undefined,
+      defaultCurrency: r.default_currency || 'INR',
     }));
   }
 
@@ -192,40 +378,47 @@ export class SplitwiseDB {
     description: string;
     totalAmount: number;
     currency?: string;
-    payers: Payer[];
     splitType: SplitType;
-    splits: SplitItem[];
     category?: string;
     isSettlement?: boolean;
+    payers: Payer[];
+    splits: SplitItem[];
     createdAt?: Date;
   }): Expense {
     const expenseId = data.id || randomUUID();
     const currency = data.currency || 'INR';
-    const createdAtStr = data.createdAt ? data.createdAt.toISOString() : new Date().toISOString();
+    const createdAt = data.createdAt ? data.createdAt.toISOString() : new Date().toISOString();
+    const isSettlement = data.isSettlement ? 1 : 0;
+    const category = data.category || (data.isSettlement ? 'Payment' : 'General');
+    const groupId = data.groupId && data.groupId !== '0' ? data.groupId : null;
 
     this.db.prepare(`
       INSERT INTO expenses (id, group_id, description, total_amount, currency, split_type, category, is_settlement, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       expenseId,
-      data.groupId || null,
+      groupId,
       data.description,
       data.totalAmount,
       currency,
       data.splitType,
-      data.category || 'General',
-      data.isSettlement ? 1 : 0,
-      createdAtStr
+      category,
+      isSettlement,
+      createdAt
     );
 
-    const payerStmt = this.db.prepare('INSERT INTO expense_payers (expense_id, user_id, amount) VALUES (?, ?, ?)');
+    const payerStmt = this.db.prepare(`
+      INSERT INTO expense_payers (expense_id, user_id, amount)
+      VALUES (?, ?, ?)
+    `);
     for (const p of data.payers) {
       payerStmt.run(expenseId, p.userId, p.amount);
     }
 
-    const splitStmt = this.db.prepare(
-      'INSERT INTO expense_splits (expense_id, user_id, amount, percentage, shares) VALUES (?, ?, ?, ?, ?)'
-    );
+    const splitStmt = this.db.prepare(`
+      INSERT INTO expense_splits (expense_id, user_id, amount, percentage, shares)
+      VALUES (?, ?, ?, ?, ?)
+    `);
     for (const s of data.splits) {
       splitStmt.run(expenseId, s.userId, s.amount, s.percentage || null, s.shares || null);
     }
@@ -233,36 +426,19 @@ export class SplitwiseDB {
     return this.getExpenseById(expenseId)!;
   }
 
-  public getExpenseById(id: string): Expense | null {
-    const row = this.db.prepare('SELECT * FROM expenses WHERE id = ?').get(id) as any;
-    if (!row) return null;
-    return this.hydrateExpense(row);
-  }
-
-  public getGroupExpenses(groupId: string): Expense[] {
-    const rows = this.db.prepare(
-      'SELECT * FROM expenses WHERE group_id = ? ORDER BY created_at DESC'
-    ).all(groupId) as any[];
-    return rows.map((r) => this.hydrateExpense(r));
-  }
-
-  public getAllExpenses(): Expense[] {
-    const rows = this.db.prepare('SELECT * FROM expenses ORDER BY created_at DESC').all() as any[];
-    return rows.map((r) => this.hydrateExpense(r));
-  }
-
-  public deleteExpense(id: string): boolean {
-    const res = this.db.prepare('DELETE FROM expenses WHERE id = ?').run(id);
-    return res.changes > 0;
-  }
-
-  public recordSettlement(groupId: string, fromUserId: string, toUserId: string, amount: number, currency = 'INR'): Expense {
+  public recordSettlement(
+    groupId: string | undefined,
+    fromUserId: string,
+    toUserId: string,
+    amount: number,
+    currency: string = 'INR'
+  ): Expense {
     const fromUser = this.getUserById(fromUserId);
     const toUser = this.getUserById(toUserId);
     const fromName = fromUser?.name || fromUserId;
     const toName = toUser?.name || toUserId;
 
-    return this.createExpense({
+    const expense = this.createExpense({
       groupId,
       description: `Settlement: ${fromName} paid ${toName}`,
       totalAmount: amount,
@@ -273,13 +449,54 @@ export class SplitwiseDB {
       payers: [{ userId: fromUserId, amount }],
       splits: [{ userId: toUserId, amount }],
     });
+
+    this.logActivity({
+      userId: fromUserId,
+      groupId: groupId && groupId !== '0' ? groupId : undefined,
+      type: 'settlement',
+      description: `${fromName} paid ${toName} ${currency === 'INR' ? '₹' : currency + ' '}${amount.toFixed(2)}`,
+    });
+
+    return expense;
+  }
+
+  public getExpenseById(id: string): Expense | null {
+    const row = this.db.prepare('SELECT * FROM expenses WHERE id = ?').get(id) as any;
+    if (!row) return null;
+    return this.hydrateExpense(row);
+  }
+
+  public getExpensesByGroupId(groupId: string): Expense[] {
+    const rows = this.db.prepare('SELECT * FROM expenses WHERE group_id = ? ORDER BY created_at DESC').all(groupId) as any[];
+    return rows.map((r) => this.hydrateExpense(r));
+  }
+
+  public getGroupExpenses(groupId: string): Expense[] {
+    return this.getExpensesByGroupId(groupId);
+  }
+
+  public getAllExpenses(): Expense[] {
+    const rows = this.db.prepare('SELECT * FROM expenses ORDER BY created_at DESC').all() as any[];
+    return rows.map((r) => this.hydrateExpense(r));
+  }
+
+  public getDirectExpenses(userId1: string, userId2: string): Expense[] {
+    const expenses = this.getAllExpenses();
+    return expenses.filter((e) => {
+      const involvesUser1 = e.payers.some((p) => p.userId === userId1) || e.splits.some((s) => s.userId === userId1);
+      const involvesUser2 = e.payers.some((p) => p.userId === userId2) || e.splits.some((s) => s.userId === userId2);
+      return involvesUser1 && involvesUser2;
+    });
+  }
+
+  public deleteExpense(expenseId: string): boolean {
+    const res = this.db.prepare('DELETE FROM expenses WHERE id = ?').run(expenseId);
+    return res.changes > 0;
   }
 
   private hydrateExpense(row: any): Expense {
-    const payerRows = this.db.prepare('SELECT user_id, amount FROM expense_payers WHERE expense_id = ?').all(row.id) as any[];
-    const splitRows = this.db.prepare(
-      'SELECT user_id, amount, percentage, shares FROM expense_splits WHERE expense_id = ?'
-    ).all(row.id) as any[];
+    const payersRows = this.db.prepare('SELECT user_id, amount FROM expense_payers WHERE expense_id = ?').all(row.id) as any[];
+    const splitsRows = this.db.prepare('SELECT user_id, amount, percentage, shares FROM expense_splits WHERE expense_id = ?').all(row.id) as any[];
 
     return {
       id: row.id,
@@ -288,13 +505,10 @@ export class SplitwiseDB {
       totalAmount: row.total_amount,
       currency: row.currency,
       splitType: row.split_type as SplitType,
-      category: row.category || undefined,
+      category: row.category,
       createdAt: new Date(row.created_at),
-      payers: payerRows.map((p) => ({
-        userId: p.user_id,
-        amount: p.amount,
-      })),
-      splits: splitRows.map((s) => ({
+      payers: payersRows.map((p) => ({ userId: p.user_id, amount: p.amount })),
+      splits: splitsRows.map((s) => ({
         userId: s.user_id,
         amount: s.amount,
         percentage: s.percentage !== null ? s.percentage : undefined,
@@ -303,7 +517,7 @@ export class SplitwiseDB {
     };
   }
 
-  // --- Friendships & 1-on-1 Expenses ---
+  // --- Friendships & Direct Ledger ---
   public addFriend(userId1: string, userId2: string): void {
     if (userId1 === userId2) return;
     const [u1, u2] = [userId1, userId2].sort();
@@ -312,13 +526,9 @@ export class SplitwiseDB {
 
   public getFriends(userId: string): User[] {
     const rows = this.db.prepare(`
-      SELECT u.id, u.name, u.email, u.avatar_url
-      FROM users u
-      WHERE u.id IN (
-        SELECT user_id2 FROM friendships WHERE user_id1 = ?
-        UNION
-        SELECT user_id1 FROM friendships WHERE user_id2 = ?
-      )
+      SELECT u.id, u.name, u.email, u.avatar_url, u.default_currency
+      FROM friendships f
+      JOIN users u ON (u.id = f.user_id1 AND f.user_id2 = ?) OR (u.id = f.user_id2 AND f.user_id1 = ?)
       ORDER BY u.name ASC
     `).all(userId, userId) as any[];
 
@@ -327,28 +537,11 @@ export class SplitwiseDB {
       name: r.name,
       email: r.email || undefined,
       avatarUrl: r.avatar_url || undefined,
+      defaultCurrency: r.default_currency || 'INR',
     }));
   }
 
-  public getDirectExpenses(userId1: string, userId2: string): Expense[] {
-    // Non-group expenses involving both users
-    const rows = this.db.prepare(`
-      SELECT DISTINCT e.*
-      FROM expenses e
-      WHERE (e.group_id IS NULL OR e.group_id = '' OR e.group_id = '0')
-        AND e.id IN (
-          SELECT expense_id FROM expense_payers WHERE user_id IN (?, ?)
-          UNION
-          SELECT expense_id FROM expense_splits WHERE user_id IN (?, ?)
-        )
-      ORDER BY e.created_at DESC
-    `).all(userId1, userId2, userId1, userId2) as any[];
-
-    return rows.map((r) => this.hydrateExpense(r));
-  }
-
   public getFriendBalance(currentUserId: string, friendId: string): number {
-    // Computes pairwise balance between currentUserId and friendId across ALL expenses
     const expenses = this.getAllExpenses();
     let balance = 0;
 
@@ -432,8 +625,93 @@ export class SplitwiseDB {
     return res.changes > 0;
   }
 
+  // --- Activities / Audit Logging ---
+  public logActivity(data: {
+    userId: string;
+    groupId?: string;
+    type: 'expense_created' | 'expense_deleted' | 'settlement' | 'comment' | 'group_created' | 'user_joined';
+    description: string;
+  }): Activity {
+    const id = randomUUID();
+    const createdAt = new Date();
+    this.db.prepare(`
+      INSERT INTO activities (id, user_id, group_id, type, description, created_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(id, data.userId, data.groupId || null, data.type, data.description, createdAt.toISOString());
+
+    const user = this.getUserById(data.userId);
+    const group = data.groupId ? this.getGroupById(data.groupId) : null;
+
+    return {
+      id,
+      userId: data.userId,
+      userName: user?.name,
+      userAvatar: user?.avatarUrl,
+      groupId: data.groupId,
+      groupName: group?.name,
+      type: data.type,
+      description: data.description,
+      createdAt,
+    };
+  }
+
+  public getActivities(limit: number = 50): Activity[] {
+    const rows = this.db.prepare(`
+      SELECT a.id, a.user_id, a.group_id, a.type, a.description, a.created_at,
+             u.name as user_name, u.avatar_url as user_avatar,
+             g.name as group_name
+      FROM activities a
+      LEFT JOIN users u ON a.user_id = u.id
+      LEFT JOIN groups g ON a.group_id = g.id
+      ORDER BY a.created_at DESC
+      LIMIT ?
+    `).all(limit) as any[];
+
+    return rows.map((r) => ({
+      id: r.id,
+      userId: r.user_id,
+      userName: r.user_name || r.user_id,
+      userAvatar: r.user_avatar,
+      groupId: r.group_id || undefined,
+      groupName: r.group_name || undefined,
+      type: r.type,
+      description: r.description,
+      createdAt: new Date(r.created_at),
+    }));
+  }
+
+  // --- Export Group Expenses to CSV ---
+  public exportGroupExpensesCSV(groupId: string): string {
+    const group = this.getGroupById(groupId);
+    if (!group) throw new Error('Group not found');
+
+    const expenses = this.getExpensesByGroupId(groupId);
+    const users = this.getUsers();
+    const userMap = new Map(users.map((u) => [u.id, u.name]));
+
+    const headers = ['Date', 'Description', 'Category', 'Cost', 'Currency', 'Payer', 'Split Type', 'Shares Breakdown'];
+    const rows: string[] = [headers.join(',')];
+
+    for (const exp of expenses) {
+      const dateStr = exp.createdAt.toISOString().split('T')[0];
+      const desc = `"${exp.description.replace(/"/g, '""')}"`;
+      const cat = exp.category || 'General';
+      const cost = exp.totalAmount.toFixed(2);
+      const curr = exp.currency;
+      const payer = `"${exp.payers.map((p) => `${userMap.get(p.userId) || p.userId} (${p.amount})`).join('; ')}"`;
+      const splitType = exp.splitType;
+      const breakdown = `"${exp.splits.map((s) => `${userMap.get(s.userId) || s.userId}: ${s.amount}`).join('; ')}"`;
+
+      rows.push([dateStr, desc, cat, cost, curr, payer, splitType, breakdown].join(','));
+    }
+
+    return rows.join('\n');
+  }
+
   public clearAllData(): void {
     this.db.exec(`
+      DELETE FROM activities;
+      DELETE FROM sessions;
       DELETE FROM comments;
       DELETE FROM friendships;
       DELETE FROM expense_splits;
