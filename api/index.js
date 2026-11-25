@@ -882,7 +882,24 @@ var PORT = process.env.PORT || 3e3;
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(rootDir, "public")));
+var envFilePath = path.join(rootDir, ".env");
+if (fs.existsSync(envFilePath)) {
+  try {
+    const lines = fs.readFileSync(envFilePath, "utf8").split("\n");
+    for (const line of lines) {
+      const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
+      if (match) {
+        const key = match[1];
+        let val = (match[2] || "").trim();
+        if (val.startsWith('"') && val.endsWith('"')) val = val.slice(1, -1);
+        if (!process.env[key]) process.env[key] = val;
+      }
+    }
+  } catch {
+  }
+}
 var runtimeGoogleClientId = process.env.GOOGLE_CLIENT_ID || "";
+var runtimeGoogleClientSecret = process.env.GOOGLE_CLIENT_SECRET || "";
 app.get("/api/config/google-client-id", (req, res) => {
   res.json({ clientId: runtimeGoogleClientId });
 });
