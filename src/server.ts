@@ -82,7 +82,7 @@ app.post(['/api/auth/register', '/api/auth/signup'], (req, res) => {
       name: name.trim(),
       email: email.trim(),
       password: password || 'password123',
-      defaultCurrency: defaultCurrency || 'INR',
+      defaultCurrency: defaultCurrency || 'USD',
       avatarUrl: avatarUrl || '👤',
     });
 

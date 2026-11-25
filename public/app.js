@@ -31,10 +31,12 @@ const CATEGORY_ICONS = {
   General: '🛒',
 };
 
-function formatCurrency(amount, currency = 'INR') {
-  const sym = currency === 'INR' ? '₹' : currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency + ' ';
+function formatCurrency(amount, currency = null) {
+  const cur = currency || (currentUser && currentUser.defaultCurrency) || 'USD';
+  const sym = cur === 'USD' ? '$' : cur === 'INR' ? '₹' : cur === 'EUR' ? '€' : cur === 'GBP' ? '£' : cur + ' ';
   const num = Math.abs(Number(amount) || 0);
-  return `${sym}${num.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const locale = cur === 'INR' ? 'en-IN' : 'en-US';
+  return `${sym}${num.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function parseMonthDay(dateStr) {
@@ -421,6 +423,76 @@ function setupEventListeners() {
       input.value = '';
     }
   });
+
+  // Settled Accounts Toggle
+  document.getElementById('btnToggleSettledAccounts')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    alert('Showing all accounts settled for more than 30 days.');
+  });
+
+  // Dashboard Balances View Toggles (view as list | view chart)
+  document.getElementById('btnDashViewList')?.addEventListener('click', () => {
+    document.getElementById('btnDashViewList')?.classList.add('active');
+    document.getElementById('btnDashViewChart')?.classList.remove('active');
+  });
+  document.getElementById('btnDashViewChart')?.addEventListener('click', () => {
+    document.getElementById('btnDashViewChart')?.classList.add('active');
+    document.getElementById('btnDashViewList')?.classList.remove('active');
+  });
+
+  // Add Expense Modal Interactive Controls (Matching Screenshot Exact Replica)
+  document.getElementById('expAmount')?.addEventListener('input', () => {
+    recalcExpensePerPerson();
+  });
+
+  document.getElementById('btnTogglePayer')?.addEventListener('click', () => {
+    const payerSelect = document.getElementById('expPayer');
+    if (payerSelect && payerSelect.options.length > 1) {
+      let nextIdx = (payerSelect.selectedIndex + 1) % payerSelect.options.length;
+      payerSelect.selectedIndex = nextIdx;
+      const opt = payerSelect.options[nextIdx];
+      const btn = document.getElementById('btnTogglePayer');
+      if (btn) btn.innerText = opt.text;
+    }
+  });
+
+  document.getElementById('btnExpDatePill')?.addEventListener('click', () => {
+    const dateInput = document.getElementById('expDate');
+    try {
+      if (dateInput?.showPicker) dateInput.showPicker();
+      else dateInput?.focus();
+    } catch {
+      dateInput?.focus();
+    }
+  });
+
+  document.getElementById('expDate')?.addEventListener('change', (e) => {
+    const dateVal = e.target.value;
+    if (dateVal) {
+      const d = new Date(dateVal + 'T00:00:00');
+      const formatted = d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+      const pillText = document.getElementById('expDatePillText');
+      if (pillText) pillText.innerText = formatted;
+    }
+  });
+
+  document.getElementById('btnExpNotesPill')?.addEventListener('click', () => {
+    document.getElementById('expNotesDrawer')?.classList.toggle('hidden');
+  });
+
+  document.getElementById('btnExpGroupPill')?.addEventListener('click', () => {
+    const ctx = document.getElementById('modalExpContext');
+    ctx.classList.toggle('hidden');
+    ctx.focus();
+  });
+
+  document.getElementById('btnRemoveToken')?.addEventListener('click', () => {
+    const tokenPill = document.getElementById('tokenSelectedFriend');
+    if (tokenPill) tokenPill.style.display = 'none';
+    const ctx = document.getElementById('modalExpContext');
+    ctx.classList.remove('hidden');
+    ctx.focus();
+  });
 }
 
 // ===== REAL GOOGLE OAUTH via Google Identity Services (GIS) =====
@@ -663,7 +735,7 @@ function openProfileModal() {
   if (!currentUser) return;
   document.getElementById('profileName').value = currentUser.name;
   document.getElementById('profileAvatar').value = currentUser.avatarUrl || '👤';
-  document.getElementById('profileCurrency').value = currentUser.defaultCurrency || 'INR';
+  document.getElementById('profileCurrency').value = currentUser.defaultCurrency || 'USD';
   document.getElementById('profileNewPassword').value = '';
   modalProfile.classList.remove('hidden');
 }
@@ -738,37 +810,47 @@ async function switchView(viewName, targetId = null) {
   document.querySelectorAll('.sw-nav-item').forEach((n) => n.classList.remove('active'));
   document.querySelectorAll('.sw-list-item').forEach((l) => l.classList.remove('active'));
 
-  // Default view display states
-  feedTab = 'expenses';
-  tabViewExpenses.classList.add('active');
-  tabViewSimplification.classList.remove('active');
-  expensesFeed.classList.remove('hidden');
-  activitiesFeed.classList.add('hidden');
-  simplificationFeed.classList.add('hidden');
-  simplificationToggles.classList.add('hidden');
-  feedSubheader.classList.remove('hidden');
+  const dashBalancesView = document.getElementById('dashboardBalancesView');
 
   if (viewName === 'dashboard') {
-    navDashboard.classList.add('active');
+    dashBalancesView?.classList.remove('hidden');
+    feedSubheader?.classList.add('hidden');
+    expensesFeed?.classList.add('hidden');
+    activitiesFeed?.classList.add('hidden');
+    simplificationFeed?.classList.add('hidden');
+    simplificationToggles?.classList.add('hidden');
+    navDashboard?.classList.add('active');
     await loadDashboardView();
-  } else if (viewName === 'activity') {
-    navRecentActivity.classList.add('active');
-    await loadRecentActivityView();
-  } else if (viewName === 'expenses') {
-    navAllExpenses.classList.add('active');
-    await loadAllExpensesView();
-  } else if (viewName === 'group') {
-    activeGroupId = targetId;
-    activeGroup = groups.find((g) => g.id === targetId) || null;
-    const groupEl = document.querySelector(`[data-group-id="${targetId}"]`);
-    if (groupEl) groupEl.classList.add('active');
-    await loadGroupView();
-  } else if (viewName === 'friend') {
-    activeFriendId = targetId;
-    activeFriend = friends.find((f) => f.friend.id === targetId) || null;
-    const friendEl = document.querySelector(`[data-friend-id="${targetId}"]`);
-    if (friendEl) friendEl.classList.add('active');
-    await loadFriendView();
+  } else {
+    dashBalancesView?.classList.add('hidden');
+    feedTab = 'expenses';
+    tabViewExpenses?.classList.add('active');
+    tabViewSimplification?.classList.remove('active');
+    expensesFeed?.classList.remove('hidden');
+    activitiesFeed?.classList.add('hidden');
+    simplificationFeed?.classList.add('hidden');
+    simplificationToggles?.classList.add('hidden');
+    feedSubheader?.classList.remove('hidden');
+
+    if (viewName === 'activity') {
+      navRecentActivity?.classList.add('active');
+      await loadRecentActivityView();
+    } else if (viewName === 'expenses') {
+      navAllExpenses?.classList.add('active');
+      await loadAllExpensesView();
+    } else if (viewName === 'group') {
+      activeGroupId = targetId;
+      activeGroup = groups.find((g) => g.id === targetId) || null;
+      const groupEl = document.querySelector(`[data-group-id="${targetId}"]`);
+      if (groupEl) groupEl.classList.add('active');
+      await loadGroupView();
+    } else if (viewName === 'friend') {
+      activeFriendId = targetId;
+      activeFriend = friends.find((f) => f.friend.id === targetId) || null;
+      const friendEl = document.querySelector(`[data-friend-id="${targetId}"]`);
+      if (friendEl) friendEl.classList.add('active');
+      await loadFriendView();
+    }
   }
 
   renderLeftSidebar();
@@ -785,12 +867,19 @@ async function reloadCurrentView() {
   }
 }
 
-// 1. Dashboard View
+// 1. Dashboard View (Exact 2-Column Balance Matrix matching after login page.png)
 async function loadDashboardView() {
-  topbarViewIcon.innerText = '📊';
+  const dashBalancesView = document.getElementById('dashboardBalancesView');
+  dashBalancesView?.classList.remove('hidden');
+  feedSubheader?.classList.add('hidden');
+  expensesFeed?.classList.add('hidden');
+  activitiesFeed?.classList.add('hidden');
+  simplificationFeed?.classList.add('hidden');
+  tabViewSimplification?.classList.add('hidden');
+
+  topbarViewIcon.innerText = '';
   centerTitle.innerText = 'Dashboard';
-  centerSubtitle.innerText = 'Overall balance and recent activity';
-  tabViewSimplification.classList.add('hidden');
+  centerSubtitle.innerText = '';
 
   const allExpRes = await authFetch('/api/expenses').then((r) => r.json());
   currentExpenses = allExpRes.data || [];
@@ -800,40 +889,103 @@ async function loadDashboardView() {
   let oweCount = 0;
   let owedCount = 0;
 
+  const owesYouList = [];
+  const youOweList = [];
+
   for (const f of friends) {
     if (f.netBalance > 0.005) {
       totalYouAreOwed += f.netBalance;
       owedCount++;
+      owesYouList.push(f);
     } else if (f.netBalance < -0.005) {
       totalYouOwe += Math.abs(f.netBalance);
       oweCount++;
+      youOweList.push(f);
     }
   }
 
   const netTotal = totalYouAreOwed - totalYouOwe;
+  const currency = (currentUser && currentUser.defaultCurrency) || 'USD';
 
   if (Math.abs(netTotal) < 0.005) {
-    ribbonTotalBalance.innerText = '₹0.00';
+    ribbonTotalBalance.innerText = formatCurrency(0, currency);
     ribbonTotalBalance.className = 'sw-ribbon-val';
     ribbonTotalBalanceSub.innerText = 'all settled up';
   } else if (netTotal > 0) {
-    ribbonTotalBalance.innerText = `+${formatCurrency(netTotal)}`;
+    ribbonTotalBalance.innerText = `+${formatCurrency(netTotal, currency)}`;
     ribbonTotalBalance.className = 'sw-ribbon-val text-teal';
     ribbonTotalBalanceSub.innerText = 'you are owed overall';
   } else {
-    ribbonTotalBalance.innerText = `-${formatCurrency(Math.abs(netTotal))}`;
+    ribbonTotalBalance.innerText = `-${formatCurrency(Math.abs(netTotal), currency)}`;
     ribbonTotalBalance.className = 'sw-ribbon-val text-orange';
     ribbonTotalBalanceSub.innerText = 'you owe overall';
   }
 
-  ribbonYouOwe.innerText = formatCurrency(totalYouOwe);
+  ribbonYouOwe.innerText = formatCurrency(totalYouOwe, currency);
   ribbonYouOweSub.innerText = oweCount === 1 ? 'to 1 person' : `to ${oweCount} people`;
 
-  ribbonYouAreOwed.innerText = formatCurrency(totalYouAreOwed);
+  ribbonYouAreOwed.innerText = formatCurrency(totalYouAreOwed, currency);
   ribbonYouAreOwedSub.innerText = owedCount === 1 ? 'from 1 person' : `from ${owedCount} people`;
 
-  renderExpensesFeed();
-  renderDashboardRightSidebar(netTotal, totalYouOwe, totalYouAreOwed);
+  // Populate Left Column: YOU OWE
+  const emptyYouOwe = document.getElementById('emptyYouOwe');
+  const listYouOwe = document.getElementById('listYouOwe');
+  if (youOweList.length === 0) {
+    emptyYouOwe?.classList.remove('hidden');
+    listYouOwe?.classList.add('hidden');
+    if (listYouOwe) listYouOwe.innerHTML = '';
+  } else {
+    emptyYouOwe?.classList.add('hidden');
+    listYouOwe?.classList.remove('hidden');
+    if (listYouOwe) {
+      listYouOwe.innerHTML = youOweList
+        .map(
+          (f) => `
+        <div class="sw-dash-user-row" onclick="switchView('friend', '${f.friend.id}')">
+          <div class="sw-dash-user-avatar">
+            ${f.friend.avatarUrl ? `<img src="${f.friend.avatarUrl}" alt="${f.friend.name}">` : '👤'}
+          </div>
+          <div class="sw-dash-user-info">
+            <span class="sw-dash-user-name">${f.friend.name}</span>
+            <span class="sw-dash-user-balance text-orange">you owe ${formatCurrency(Math.abs(f.netBalance), currency)}</span>
+          </div>
+        </div>
+      `
+        )
+        .join('');
+    }
+  }
+
+  // Populate Right Column: YOU ARE OWED (Exact match to after login page.png: e.g. "Anu owes you $1,831.32")
+  const emptyYouAreOwed = document.getElementById('emptyYouAreOwed');
+  const listYouAreOwed = document.getElementById('listYouAreOwed');
+  if (owesYouList.length === 0) {
+    emptyYouAreOwed?.classList.remove('hidden');
+    listYouAreOwed?.classList.add('hidden');
+    if (listYouAreOwed) listYouAreOwed.innerHTML = '';
+  } else {
+    emptyYouAreOwed?.classList.add('hidden');
+    listYouAreOwed?.classList.remove('hidden');
+    if (listYouAreOwed) {
+      listYouAreOwed.innerHTML = owesYouList
+        .map(
+          (f) => `
+        <div class="sw-dash-user-row" onclick="switchView('friend', '${f.friend.id}')">
+          <div class="sw-dash-user-avatar">
+            ${f.friend.avatarUrl ? `<img src="${f.friend.avatarUrl}" alt="${f.friend.name}">` : '👤'}
+          </div>
+          <div class="sw-dash-user-info">
+            <span class="sw-dash-user-name">${f.friend.name}</span>
+            <span class="sw-dash-user-balance text-teal">owes you ${formatCurrency(f.netBalance, currency)}</span>
+          </div>
+        </div>
+      `
+        )
+        .join('');
+    }
+  }
+
+  renderDashboardRightSidebar();
 }
 
 // 2. Recent Activity View (Audit Stream)
@@ -1309,84 +1461,29 @@ function renderSimplificationFeed() {
 }
 
 // Right Sidebar Renderers
-function renderDashboardRightSidebar(netTotal, totalYouOwe, totalYouAreOwed) {
-  const owesYouList = friends.filter((f) => f.netBalance > 0.005);
-  const youOweList = friends.filter((f) => f.netBalance < -0.005);
-
-  let netMarkup = '';
-  if (Math.abs(netTotal) < 0.005) {
-    netMarkup = `<span class="sw-right-big-balance" style="color:#888;">₹0.00</span>`;
-  } else if (netTotal > 0) {
-    netMarkup = `<span class="sw-right-big-balance text-teal">+${formatCurrency(netTotal)}</span>`;
-  } else {
-    netMarkup = `<span class="sw-right-big-balance text-orange">-${formatCurrency(Math.abs(netTotal))}</span>`;
-  }
-
+function renderDashboardRightSidebar() {
   rightSidebarContent.innerHTML = `
-    <div>
-      <div class="sw-right-header">YOUR TOTAL BALANCE</div>
-      ${netMarkup}
+    <div class="sw-pro-widget" id="proWidget">
+      <div class="sw-pro-icon-wrap">
+        <svg class="sw-pro-gem-icon" viewBox="0 0 64 64" width="56" height="56">
+          <defs>
+            <linearGradient id="proGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#ab55f7"/>
+              <stop offset="100%" stop-color="#6366f1"/>
+            </linearGradient>
+          </defs>
+          <polygon points="32 4, 56 22, 32 60, 8 22" fill="url(#proGrad)"/>
+          <polygon points="32 4, 56 22, 32 28, 8 22" fill="#c084fc" opacity="0.6"/>
+          <polygon points="32 28, 56 22, 32 60" fill="#7e22ce" opacity="0.5"/>
+          <polygon points="32 28, 8 22, 32 60" fill="#9333ea" opacity="0.7"/>
+          <circle cx="50" cy="12" r="3" fill="#fbbf24"/>
+          <polygon points="12 10, 14 6, 16 10, 20 12, 16 14, 14 18, 12 14, 8 12" fill="#fbbf24"/>
+        </svg>
+      </div>
+      <h4 class="sw-pro-title">GET SPLITWISE PRO!</h4>
+      <p class="sw-pro-desc">Never keep track of a receipt again! With Splitwise Pro, you can organize your receipts, scan receipts automatically, and more.</p>
+      <button type="button" class="sw-btn-pro-learn" id="btnLearnSplitwisePro" onclick="alert('Splitwise Pro includes receipt scanning, currency conversion, expense search, and charts!')">Learn more</button>
     </div>
-
-    ${
-      youOweList.length > 0
-        ? `
-      <div>
-        <div class="sw-right-header text-orange">YOU OWE</div>
-        <div class="sw-balance-user-list">
-          ${youOweList
-            .map(
-              (f) => `
-            <div class="sw-balance-user-row" style="cursor:pointer;" onclick="switchView('friend', '${f.friend.id}')">
-              <div class="sw-balance-user-info">
-                <span>${f.friend.avatarUrl || '👤'}</span>
-                <span class="sw-balance-user-name">${f.friend.name}</span>
-              </div>
-              <span class="sw-balance-user-val text-orange">you owe ${formatCurrency(Math.abs(f.netBalance))}</span>
-            </div>
-          `
-            )
-            .join('')}
-        </div>
-      </div>
-    `
-        : ''
-    }
-
-    ${
-      owesYouList.length > 0
-        ? `
-      <div>
-        <div class="sw-right-header text-teal">YOU ARE OWED</div>
-        <div class="sw-balance-user-list">
-          ${owesYouList
-            .map(
-              (f) => `
-            <div class="sw-balance-user-row" style="cursor:pointer;" onclick="switchView('friend', '${f.friend.id}')">
-              <div class="sw-balance-user-info">
-                <span>${f.friend.avatarUrl || '👤'}</span>
-                <span class="sw-balance-user-name">${f.friend.name}</span>
-              </div>
-              <span class="sw-balance-user-val text-teal">owes you ${formatCurrency(f.netBalance)}</span>
-            </div>
-          `
-            )
-            .join('')}
-        </div>
-      </div>
-    `
-        : ''
-    }
-
-    ${
-      owesYouList.length === 0 && youOweList.length === 0
-        ? `
-      <div style="font-size:12px; color:#888;">
-        You do not owe anything and no one owes you! 🎉
-      </div>
-    `
-        : ''
-    }
   `;
 }
 
@@ -1488,8 +1585,14 @@ function renderFriendRightSidebar() {
 }
 
 // Modals Setup & Openers
-function openExpenseModal() {
+function openExpenseModal(targetContext = null) {
   const contextSelect = document.getElementById('modalExpContext');
+  const tokenPill = document.getElementById('tokenSelectedFriend');
+  const tokenAvatar = document.getElementById('tokenAvatar');
+  const tokenName = document.getElementById('tokenName');
+  const currencySym = document.getElementById('modalCurrencySymbol');
+  const currency = (currentUser && currentUser.defaultCurrency) || 'USD';
+  if (currencySym) currencySym.innerText = currency === 'USD' ? '$' : currency === 'INR' ? '₹' : currency === 'EUR' ? '€' : currency;
 
   let options = '';
   options += `<optgroup label="Groups">`;
@@ -1502,39 +1605,122 @@ function openExpenseModal() {
 
   contextSelect.innerHTML = options;
 
-  if (currentView === 'group' && activeGroupId) {
+  let chosenFriend = null;
+  let chosenGroup = null;
+
+  if (targetContext) {
+    contextSelect.value = targetContext;
+    const [t, id] = targetContext.split(':');
+    if (t === 'group') chosenGroup = groups.find((g) => g.id === id);
+    else chosenFriend = friends.find((f) => f.friend.id === id)?.friend;
+  } else if (currentView === 'group' && activeGroupId) {
     contextSelect.value = `group:${activeGroupId}`;
+    chosenGroup = activeGroup;
   } else if (currentView === 'friend' && activeFriendId) {
     contextSelect.value = `friend:${activeFriendId}`;
+    chosenFriend = activeFriend?.friend;
+  } else if (friends.length > 0) {
+    contextSelect.value = `friend:${friends[0].friend.id}`;
+    chosenFriend = friends[0].friend;
+  } else if (groups.length > 0) {
+    contextSelect.value = `group:${groups[0].id}`;
+    chosenGroup = groups[0];
   }
 
-  document.getElementById('expDate').value = new Date().toISOString().split('T')[0];
+  // Format today's date for date pill: "November 25, 2026"
+  const today = new Date();
+  const dateStr = today.toISOString().split('T')[0];
+  const dateOptions = { month: 'long', day: 'numeric', year: 'numeric' };
+  const formattedDate = today.toLocaleDateString('en-US', dateOptions);
+
+  const expDateInput = document.getElementById('expDate');
+  if (expDateInput) expDateInput.value = dateStr;
+  const expDatePillText = document.getElementById('expDatePillText');
+  if (expDatePillText) expDatePillText.innerText = formattedDate;
+
+  // Group Pill
+  const expGroupPillText = document.getElementById('expGroupPillText');
+  if (chosenGroup) {
+    if (expGroupPillText) expGroupPillText.innerText = chosenGroup.name;
+  } else {
+    if (expGroupPillText) expGroupPillText.innerText = 'No group';
+  }
+
+  // Token Pill (matching add expense .png)
+  if (chosenFriend) {
+    if (tokenPill) tokenPill.style.display = 'inline-flex';
+    if (tokenAvatar) tokenAvatar.innerText = chosenFriend.avatarUrl || '👤';
+    if (tokenName) tokenName.innerText = chosenFriend.email || chosenFriend.name;
+  } else {
+    if (tokenPill) tokenPill.style.display = 'none';
+  }
+
+  // Reset inputs
+  const expDesc = document.getElementById('expDesc');
+  if (expDesc) expDesc.value = '';
+  const expAmount = document.getElementById('expAmount');
+  if (expAmount) expAmount.value = '';
+
   updateExpenseModalParticipants();
+  recalcExpensePerPerson();
   modalAddExpense.classList.remove('hidden');
+}
+
+function recalcExpensePerPerson() {
+  const amtInput = document.getElementById('expAmount');
+  const splitSub = document.getElementById('splitDetailSub');
+  const amount = parseFloat(amtInput?.value || '0');
+  const checkedUsers = Array.from(document.querySelectorAll('.sw-modal-user-cb:checked'));
+  const count = Math.max(checkedUsers.length, 1);
+  const perPerson = amount / count;
+  const currency = (currentUser && currentUser.defaultCurrency) || 'USD';
+  if (splitSub) {
+    splitSub.innerText = `(${formatCurrency(perPerson, currency)}/person)`;
+  }
 }
 
 function updateExpenseModalParticipants() {
   const contextVal = document.getElementById('modalExpContext').value;
+  if (!contextVal) return;
   const [type, id] = contextVal.split(':');
   const payerSelect = document.getElementById('expPayer');
+  const btnTogglePayer = document.getElementById('btnTogglePayer');
 
   let participants = [];
   if (type === 'group') {
     const grp = groups.find((g) => g.id === id);
     participants = grp ? grp.members : allUsers;
+    const expGroupPillText = document.getElementById('expGroupPillText');
+    if (expGroupPillText) expGroupPillText.innerText = grp ? grp.name : 'Group';
+    const tokenPill = document.getElementById('tokenSelectedFriend');
+    if (tokenPill) tokenPill.style.display = 'none';
   } else {
     const fr = friends.find((f) => f.friend.id === id);
     const me = allUsers.find((u) => u.id === currentUser?.id);
     participants = [me, fr?.friend].filter(Boolean);
+    const expGroupPillText = document.getElementById('expGroupPillText');
+    if (expGroupPillText) expGroupPillText.innerText = 'No group';
+    const tokenPill = document.getElementById('tokenSelectedFriend');
+    const tokenAvatar = document.getElementById('tokenAvatar');
+    const tokenName = document.getElementById('tokenName');
+    if (fr && tokenPill) {
+      tokenPill.style.display = 'inline-flex';
+      if (tokenAvatar) tokenAvatar.innerText = fr.friend.avatarUrl || '👤';
+      if (tokenName) tokenName.innerText = fr.friend.email || fr.friend.name;
+    }
   }
 
   payerSelect.innerHTML = participants
-    .map((p) => `<option value="${p.id}">${p.id === currentUser?.id ? 'You' : p.name}</option>`)
+    .map((p) => `<option value="${p.id}">${p.id === currentUser?.id ? 'you' : p.name}</option>`)
     .join('');
-  if (currentUser) payerSelect.value = currentUser.id;
+  if (currentUser) {
+    payerSelect.value = currentUser.id;
+    if (btnTogglePayer) btnTogglePayer.innerText = 'you';
+  }
 
   const splitType = document.getElementById('activeSplitType').value || 'EQUAL';
   renderParticipantSplitRows(splitType, participants);
+  recalcExpensePerPerson();
 }
 
 function renderParticipantSplitRows(splitType, userList = null) {
@@ -1677,7 +1863,7 @@ async function handleExpenseSubmit(e) {
         groupId: contextType === 'group' ? contextId : '0',
         description: desc,
         totalAmount: amount,
-        currency: 'INR',
+        currency: (currentUser && currentUser.defaultCurrency) || 'USD',
         category,
         splitType,
         payers: [{ userId: payerId, amount }],
@@ -1691,9 +1877,13 @@ async function handleExpenseSubmit(e) {
 
     modalAddExpense.classList.add('hidden');
     formAddExpense.reset();
-    document.getElementById('splitTabsWrap').classList.add('hidden');
+    document.getElementById('splitTabsWrap')?.classList.add('hidden');
+    document.getElementById('expNotesDrawer')?.classList.add('hidden');
 
-    if (contextType === 'group') {
+    await reloadFriends();
+    if (currentView === 'dashboard') {
+      await switchView('dashboard');
+    } else if (contextType === 'group') {
       await switchView('group', contextId);
     } else {
       await switchView('friend', contextId);
@@ -1724,7 +1914,7 @@ async function handleSettleSubmit(e) {
         fromUserId: payerId,
         toUserId: receiverId,
         amount,
-        currency: 'INR',
+        currency: (currentUser && currentUser.defaultCurrency) || 'USD',
       }),
     });
 

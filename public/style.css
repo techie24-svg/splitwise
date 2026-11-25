@@ -28,7 +28,7 @@
   --sw-header-height: 48px;
   --sw-radius-sm: 4px;
   --sw-radius-md: 6px;
-  --sw-font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --sw-font: 'Lato', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 }
 
 * {
@@ -382,6 +382,25 @@ body {
   margin-left: 6px;
 }
 
+/* Sidebar Settled Accounts Toggle */
+.sw-settled-notice {
+  padding: 8px 16px;
+  margin-top: 4px;
+}
+
+.sw-settled-link {
+  font-size: 11px;
+  color: var(--sw-text-muted);
+  text-decoration: none;
+  line-height: 1.3;
+  display: block;
+}
+
+.sw-settled-link:hover {
+  color: var(--sw-teal);
+  text-decoration: underline;
+}
+
 /* Invite Friends Box */
 .sw-invite-widget {
   padding: 14px 16px;
@@ -566,6 +585,173 @@ body {
 .sw-ribbon-sub {
   font-size: 11px;
   color: var(--sw-text-light);
+}
+
+/* ==========================================================================
+   Splitwise Dashboard 2-Column Balance Matrix (Screenshot Exact Replica)
+   ========================================================================== */
+.sw-dashboard-balances-view {
+  display: flex;
+  flex-direction: column;
+  background-color: #ffffff;
+  min-height: 420px;
+}
+
+.sw-dash-subheader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--sw-border);
+  background-color: #ffffff;
+}
+
+.sw-dash-subheader-left,
+.sw-dash-subheader-right {
+  flex: 1;
+}
+
+.sw-dash-subheader-right {
+  text-align: right;
+}
+
+.sw-dash-col-title {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--sw-text-muted);
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+
+.sw-dash-subheader-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sw-dash-view-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--sw-text-muted);
+}
+
+.sw-dash-toggle-btn {
+  background: none;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--sw-text-muted);
+  font-size: 11px;
+  font-family: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+
+.sw-dash-toggle-btn.active {
+  color: var(--sw-text);
+  font-weight: 700;
+}
+
+.sw-dash-toggle-btn:hover {
+  color: var(--sw-teal);
+}
+
+.sw-dash-toggle-sep {
+  color: var(--sw-border);
+  font-size: 12px;
+}
+
+.sw-dash-columns-body {
+  display: flex;
+  flex: 1;
+}
+
+.sw-dash-col {
+  flex: 1;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sw-dash-col-divider {
+  width: 1px;
+  background-color: var(--sw-border-light);
+}
+
+.sw-empty-debt-wrap {
+  padding: 14px 0;
+}
+
+.sw-empty-debt-text {
+  font-size: 13px;
+  color: var(--sw-text-muted);
+  font-style: italic;
+}
+
+.sw-dash-user-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sw-dash-user-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: var(--sw-radius-sm);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.sw-dash-user-row:hover {
+  background-color: #f7f9f8;
+}
+
+.sw-dash-user-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background-color: #edf2f7;
+  border: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.sw-dash-user-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.sw-dash-user-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+}
+
+.sw-dash-user-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--sw-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sw-dash-user-balance {
+  font-size: 12px;
+  font-weight: 700;
 }
 
 /* Feed Subheader / Mode Tabs */
@@ -1061,6 +1247,56 @@ body {
   flex-shrink: 0;
 }
 
+/* Splitwise Pro Widget (Right Sidebar Exact Replica) */
+.sw-pro-widget {
+  background: linear-gradient(180deg, #ffffff 0%, #fafafa 100%);
+  border: 1px solid var(--sw-border);
+  border-radius: var(--sw-radius-md);
+  padding: 20px 16px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.sw-pro-icon-wrap {
+  margin-bottom: 12px;
+}
+
+.sw-pro-title {
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.8px;
+  color: #555555;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.sw-pro-desc {
+  font-size: 12px;
+  line-height: 1.45;
+  color: #666666;
+  margin-bottom: 16px;
+}
+
+.sw-btn-pro-learn {
+  background-color: var(--sw-orange);
+  color: #ffffff;
+  border: none;
+  border-radius: var(--sw-radius-sm);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 8px 18px;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.sw-btn-pro-learn:hover {
+  background-color: var(--sw-orange-hover);
+}
+
 /* ==========================================================================
    Splitwise Modals
    ========================================================================== */
@@ -1087,6 +1323,10 @@ body {
   max-height: 90vh;
 }
 
+.sw-modal-expense {
+  width: 440px;
+}
+
 .sw-modal-header {
   background-color: var(--sw-teal);
   color: #ffffff;
@@ -1094,6 +1334,11 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.sw-modal-header-teal {
+  background-color: var(--sw-teal) !important;
+  color: #ffffff !important;
 }
 
 .sw-modal-title {
@@ -1118,6 +1363,82 @@ body {
   gap: 16px;
 }
 
+.sw-modal-body-expense {
+  padding: 18px 22px;
+  gap: 14px;
+}
+
+/* Participant Token Row (Matching Add Expense Screenshot) */
+.sw-token-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--sw-border-light);
+}
+
+.sw-token-label {
+  font-size: 14px;
+  color: #444444;
+  white-space: nowrap;
+}
+
+.sw-tokens-container {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 1;
+}
+
+.sw-token-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background-color: #e8f7f3;
+  border: 1px solid #a3e4d4;
+  border-radius: 14px;
+  padding: 3px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #1a4f42;
+}
+
+.sw-token-avatar {
+  font-size: 13px;
+}
+
+.sw-token-remove {
+  background: none;
+  border: none;
+  color: #888888;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+}
+
+.sw-token-remove:hover {
+  color: var(--sw-orange);
+}
+
+.sw-token-select {
+  flex: 1;
+  min-width: 130px;
+  padding: 5px 8px;
+  border: 1px solid var(--sw-border);
+  border-radius: var(--sw-radius-sm);
+  font-size: 13px;
+  font-family: inherit;
+  background-color: #ffffff;
+  outline: none;
+}
+
+.sw-token-select:focus {
+  border-color: var(--sw-teal);
+}
+
 .sw-target-selector {
   display: flex;
   align-items: center;
@@ -1139,12 +1460,22 @@ body {
   border-color: var(--sw-teal);
 }
 
-/* Expense Hero Entry (Splitwise style) */
+/* Expense Hero Entry (Splitwise style: Receipt Icon + Dashed Inputs) */
 .sw-expense-hero-entry {
   display: flex;
   align-items: center;
   gap: 16px;
   padding: 8px 0;
+}
+
+.sw-receipt-icon-box {
+  width: 50px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
 }
 
 .sw-category-selector {
@@ -1165,18 +1496,19 @@ body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .sw-input-desc {
   border: none;
-  border-bottom: 1px dashed #ccc;
+  border-bottom: 1px dashed #cccccc;
   font-family: inherit;
   font-size: 18px;
-  font-weight: 600;
+  font-weight: 500;
   padding: 4px 0;
   outline: none;
   color: var(--sw-text);
+  width: 100%;
 }
 .sw-input-desc:focus {
   border-bottom: 1px solid var(--sw-teal);
@@ -1186,37 +1518,64 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
+  border-bottom: 1px dashed #cccccc;
+  width: 170px;
+  padding-bottom: 2px;
 }
 
 .sw-currency-sym {
-  font-size: 22px;
+  font-size: 26px;
   font-weight: 700;
-  color: #666;
+  color: #555555;
 }
 
 .sw-input-amount {
   border: none;
-  border-bottom: 1px dashed #ccc;
   font-family: inherit;
-  font-size: 24px;
-  font-weight: 800;
-  padding: 4px 0;
+  font-size: 28px;
+  font-weight: 700;
+  padding: 2px 0;
   outline: none;
-  width: 160px;
+  width: 100%;
   color: var(--sw-text);
 }
 .sw-input-amount:focus {
-  border-bottom: 1px solid var(--sw-teal);
+  color: #111111;
 }
 
-/* Split Sentence */
+/* Split Sentence Row */
 .sw-split-sentence-box {
-  background-color: #f7f7f7;
-  padding: 10px 14px;
-  border-radius: var(--sw-radius-sm);
-  text-align: center;
+  background-color: transparent;
+  padding: 4px 0;
   font-size: 14px;
-  color: #444;
+  color: #555555;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sw-pill-dashed {
+  background-color: #ffffff;
+  border: 1px dashed #999999;
+  border-radius: 12px;
+  padding: 2px 10px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--sw-text);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.sw-pill-dashed:hover {
+  border-color: var(--sw-teal);
+  color: var(--sw-teal);
+}
+
+.sw-split-calc-label {
+  font-size: 13px;
+  color: #888888;
 }
 
 .sw-inline-select {
@@ -1233,6 +1592,64 @@ body {
   font-weight: 700;
   cursor: pointer;
   text-decoration: underline;
+}
+
+/* Meta Action Pills Row (Date, Notes, Group) */
+.sw-meta-pills-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.sw-meta-pill {
+  background-color: #ffffff;
+  border: 1px solid #d0d0d0;
+  border-radius: 14px;
+  padding: 5px 12px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: #555555;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.sw-meta-pill:hover {
+  border-color: #999999;
+  background-color: #f9f9f9;
+}
+
+.sw-meta-pill-group {
+  background-color: #f8faf9;
+  border-color: #c4e5dc;
+  color: #1a4f42;
+}
+
+.sw-pill-icon {
+  font-size: 13px;
+}
+
+.sw-notes-drawer {
+  width: 100%;
+}
+
+.sw-notes-textarea {
+  width: 100%;
+  height: 60px;
+  border: 1px solid var(--sw-border);
+  border-radius: var(--sw-radius-sm);
+  padding: 8px;
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+  resize: vertical;
+}
+
+.sw-notes-textarea:focus {
+  border-color: var(--sw-teal);
 }
 
 /* Split Tabs */

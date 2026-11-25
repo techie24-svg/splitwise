@@ -129,7 +129,7 @@ var SplitwiseDB = class {
     const salt = randomBytes(16).toString("hex");
     const password = data.password || "password123";
     const passwordHash = this.hashPassword(password, salt);
-    const defaultCurrency = data.defaultCurrency || "INR";
+    const defaultCurrency = data.defaultCurrency || "USD";
     const avatarUrl = data.avatarUrl || "\u{1F464}";
     const stmt = this.db.prepare(`
       INSERT INTO users (id, name, email, password_hash, salt, avatar_url, default_currency)
@@ -193,14 +193,14 @@ var SplitwiseDB = class {
         name: row.name,
         email: row.email,
         avatarUrl: row.avatar_url || data.avatarUrl || "\u{1F464}",
-        defaultCurrency: row.default_currency || "INR"
+        defaultCurrency: row.default_currency || "USD"
       };
     } else {
       const id = randomUUID();
       const salt = randomBytes(16).toString("hex");
       const passwordHash = this.hashPassword(randomBytes(32).toString("hex"), salt);
       const avatarUrl = data.avatarUrl || "\u{1F464}";
-      const defaultCurrency = "INR";
+      const defaultCurrency = "USD";
       this.db.prepare(`
         INSERT INTO users (id, name, email, password_hash, salt, avatar_url, default_currency, google_id)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -933,7 +933,7 @@ app.post(["/api/auth/register", "/api/auth/signup"], (req, res) => {
       name: name.trim(),
       email: email.trim(),
       password: password || "password123",
-      defaultCurrency: defaultCurrency || "INR",
+      defaultCurrency: defaultCurrency || "USD",
       avatarUrl: avatarUrl || "\u{1F464}"
     });
     res.status(201).json({ success: true, data: { user, token } });

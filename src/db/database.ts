@@ -135,7 +135,7 @@ export class SplitwiseDB {
     const salt = randomBytes(16).toString('hex');
     const password = data.password || 'password123';
     const passwordHash = this.hashPassword(password, salt);
-    const defaultCurrency = data.defaultCurrency || 'INR';
+    const defaultCurrency = data.defaultCurrency || 'USD';
     const avatarUrl = data.avatarUrl || '👤';
 
     const stmt = this.db.prepare(`
@@ -217,14 +217,14 @@ export class SplitwiseDB {
         name: row.name,
         email: row.email,
         avatarUrl: row.avatar_url || data.avatarUrl || '👤',
-        defaultCurrency: row.default_currency || 'INR',
+        defaultCurrency: row.default_currency || 'USD',
       };
     } else {
       const id = randomUUID();
       const salt = randomBytes(16).toString('hex');
       const passwordHash = this.hashPassword(randomBytes(32).toString('hex'), salt);
       const avatarUrl = data.avatarUrl || '👤';
-      const defaultCurrency = 'INR';
+      const defaultCurrency = 'USD';
 
       this.db.prepare(`
         INSERT INTO users (id, name, email, password_hash, salt, avatar_url, default_currency, google_id)

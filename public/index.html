@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Montserrat:wght@700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Lato:ital,wght@0,300;0,400;0,700;0,900;1,400&family=Montserrat:wght@700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <!-- Google Identity Services SDK for real OAuth -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -165,6 +165,10 @@
               </svg>
               <span>Recent activity</span>
             </button>
+            <div class="sw-sidebar-filter-wrap">
+              <span class="sw-sidebar-search-icon">🔍</span>
+              <input type="text" id="sidebarFilterInput" class="sw-sidebar-filter" placeholder="Filter by name">
+            </div>
             <button class="sw-nav-item" id="navAllExpenses" data-view="expenses">
               <svg class="sw-nav-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
                 <line x1="8" y1="6" x2="21" y2="6"></line>
@@ -194,6 +198,9 @@
               <button class="sw-btn-add-text" id="btnAddFriendLeft" title="Add a friend">+ add</button>
             </div>
             <div class="sw-sidebar-list" id="sidebarFriendsList"></div>
+            <div class="sw-settled-notice" id="settledNotice">
+              <a href="#" id="btnToggleSettledAccounts" class="sw-settled-link">Hiding accounts settled for more than 30 days. Show »</a>
+            </div>
           </div>
 
           <!-- Invite Friends Widget -->
@@ -232,18 +239,64 @@
           <div class="sw-summary-ribbon" id="summaryRibbon">
             <div class="sw-ribbon-block">
               <span class="sw-ribbon-label">total balance</span>
-              <span class="sw-ribbon-val" id="ribbonTotalBalance">₹0.00</span>
+              <span class="sw-ribbon-val" id="ribbonTotalBalance">$0.00</span>
               <span class="sw-ribbon-sub" id="ribbonTotalBalanceSub">all settled up</span>
             </div>
             <div class="sw-ribbon-block">
               <span class="sw-ribbon-label">you owe</span>
-              <span class="sw-ribbon-val text-orange" id="ribbonYouOwe">₹0.00</span>
+              <span class="sw-ribbon-val text-orange" id="ribbonYouOwe">$0.00</span>
               <span class="sw-ribbon-sub" id="ribbonYouOweSub">0 friends</span>
             </div>
             <div class="sw-ribbon-block">
               <span class="sw-ribbon-label">you are owed</span>
-              <span class="sw-ribbon-val text-teal" id="ribbonYouAreOwed">₹0.00</span>
+              <span class="sw-ribbon-val text-teal" id="ribbonYouAreOwed">$0.00</span>
               <span class="sw-ribbon-sub" id="ribbonYouAreOwedSub">0 friends</span>
+            </div>
+          </div>
+
+          <!-- Splitwise 2-Column Dashboard Balances View (Screenshot Exact Replica) -->
+          <div class="sw-dashboard-balances-view" id="dashboardBalancesView">
+            <div class="sw-dash-subheader">
+              <div class="sw-dash-subheader-left">
+                <span class="sw-dash-col-title">YOU OWE</span>
+              </div>
+              <div class="sw-dash-subheader-center">
+                <div class="sw-dash-view-toggle">
+                  <button type="button" class="sw-dash-toggle-btn active" id="btnDashViewList">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"/></svg>
+                    <span>view as list</span>
+                  </button>
+                  <span class="sw-dash-toggle-sep">|</span>
+                  <button type="button" class="sw-dash-toggle-btn" id="btnDashViewChart">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M5 9.2h3V19H5zM10.6 5h2.8v14h-2.8zm5.6 8H19v6h-2.8z"/></svg>
+                    <span>view chart</span>
+                  </button>
+                </div>
+              </div>
+              <div class="sw-dash-subheader-right">
+                <span class="sw-dash-col-title">YOU ARE OWED</span>
+              </div>
+            </div>
+
+            <div class="sw-dash-columns-body">
+              <!-- Left Column: YOU OWE -->
+              <div class="sw-dash-col sw-dash-col-left" id="colYouOwe">
+                <div class="sw-empty-debt-wrap" id="emptyYouOwe">
+                  <span class="sw-empty-debt-text">You do not owe anything</span>
+                </div>
+                <div class="sw-dash-user-list hidden" id="listYouOwe"></div>
+              </div>
+
+              <!-- Vertical Divider -->
+              <div class="sw-dash-col-divider"></div>
+
+              <!-- Right Column: YOU ARE OWED -->
+              <div class="sw-dash-col sw-dash-col-right" id="colYouAreOwed">
+                <div class="sw-empty-debt-wrap hidden" id="emptyYouAreOwed">
+                  <span class="sw-empty-debt-text">You are not owed anything</span>
+                </div>
+                <div class="sw-dash-user-list" id="listYouAreOwed"></div>
+              </div>
             </div>
           </div>
 
@@ -392,8 +445,8 @@
           <div class="sw-form-group">
             <label class="sw-field-label">Default Currency</label>
             <select id="signupCurrency" class="sw-select-control">
+              <option value="USD" selected>USD ($) - US Dollar</option>
               <option value="INR">INR (₹) - Indian Rupee</option>
-              <option value="USD">USD ($) - US Dollar</option>
               <option value="EUR">EUR (€) - Euro</option>
               <option value="GBP">GBP (£) - British Pound</option>
             </select>
@@ -506,43 +559,65 @@
   </div>
 
   <!-- ============================================== -->
-  <!-- MODAL: ADD AN EXPENSE                         -->
+  <!-- MODAL: ADD AN EXPENSE (EXACT SPLITWISE REPLICA)-->
   <!-- ============================================== -->
   <div class="sw-modal-overlay hidden" id="modalAddExpense">
-    <div class="sw-modal-dialog">
-      <div class="sw-modal-header">
+    <div class="sw-modal-dialog sw-modal-expense">
+      <div class="sw-modal-header sw-modal-header-teal">
         <h3 class="sw-modal-title">Add an expense</h3>
         <button class="sw-modal-close" data-close="modalAddExpense">&times;</button>
       </div>
 
-      <form id="formAddExpense" class="sw-modal-body">
-        <div class="sw-form-row sw-target-selector">
-          <label class="sw-form-label">With <strong>you</strong> and:</label>
-          <select id="modalExpContext" class="sw-select-control"></select>
+      <form id="formAddExpense" class="sw-modal-body sw-modal-body-expense">
+        <!-- Participant Tokens Row -->
+        <div class="sw-token-row">
+          <span class="sw-token-label">With <strong>you</strong> and:</span>
+          <div class="sw-tokens-container" id="expenseTokensContainer">
+            <div class="sw-token-pill" id="tokenSelectedFriend" style="display:none;">
+              <span class="sw-token-avatar" id="tokenAvatar">👤</span>
+              <span class="sw-token-name" id="tokenName">Friend</span>
+              <button type="button" class="sw-token-remove" id="btnRemoveToken" title="Remove">&times;</button>
+            </div>
+            <select id="modalExpContext" class="sw-token-select">
+              <!-- Dynamically populated with friends and groups -->
+            </select>
+          </div>
         </div>
 
+        <!-- Expense Hero Entry: Receipt Icon + Dashed Inputs -->
         <div class="sw-expense-hero-entry">
-          <div class="sw-category-selector" id="categorySelectorTrigger" title="Choose Category">
-            <span id="selectedCategoryIcon" class="sw-category-big-icon">🍽️</span>
-            <input type="hidden" id="expCategory" value="Food">
+          <div class="sw-receipt-icon-box" id="categorySelectorTrigger" title="Category / Receipt">
+            <svg viewBox="0 0 48 56" width="44" height="52" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="2" y="2" width="44" height="52" rx="4" fill="#f8fafc" stroke="#94a3b8" stroke-width="2"/>
+              <line x1="8" y1="12" x2="40" y2="12" stroke="#64748b" stroke-width="2.5" stroke-linecap="round"/>
+              <line x1="8" y1="20" x2="30" y2="20" stroke="#cbd5e1" stroke-width="2" stroke-linecap="round"/>
+              <line x1="8" y1="28" x2="40" y2="28" stroke="#cbd5e1" stroke-width="2" stroke-linecap="round"/>
+              <line x1="8" y1="36" x2="24" y2="36" stroke="#cbd5e1" stroke-width="2" stroke-linecap="round"/>
+              <line x1="8" y1="44" x2="36" y2="44" stroke="#64748b" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            <input type="hidden" id="expCategory" value="General">
           </div>
 
           <div class="sw-hero-inputs">
-            <input type="text" id="expDesc" class="sw-input-desc" placeholder="Enter a description (e.g. Dinner, Taxi, Villa)" required>
+            <input type="text" id="expDesc" class="sw-input-desc" placeholder="Enter a description" required autocomplete="off">
             <div class="sw-input-amount-wrap">
-              <span class="sw-currency-sym" id="modalCurrencySymbol">₹</span>
-              <input type="number" step="0.01" min="0.01" id="expAmount" class="sw-input-amount" placeholder="0.00" required>
+              <span class="sw-currency-sym" id="modalCurrencySymbol">$</span>
+              <input type="number" step="0.01" min="0.01" id="expAmount" class="sw-input-amount" placeholder="0.00" required autocomplete="off">
             </div>
           </div>
         </div>
 
+        <!-- Split Sentence Row -->
         <div class="sw-split-sentence-box">
           Paid by
-          <select id="expPayer" class="sw-inline-select"></select>
+          <button type="button" class="sw-pill-dashed" id="btnTogglePayer">you</button>
           and split
-          <span class="sw-clickable-link" id="btnToggleSplitType">equally</span>.
+          <button type="button" class="sw-pill-dashed" id="btnToggleSplitType">equally</button>.
+          <span class="sw-split-calc-label" id="splitDetailSub">($0.00/person)</span>
+          <select id="expPayer" class="hidden"></select>
         </div>
 
+        <!-- Split Config Drawer (for non-equal / advanced split) -->
         <div class="sw-split-tabs-wrap hidden" id="splitTabsWrap">
           <div class="sw-split-tabs">
             <button type="button" class="sw-split-tab active" data-type="EQUAL">= Equally</button>
@@ -554,22 +629,30 @@
           <div class="sw-participants-split-box" id="participantsSplitBox"></div>
         </div>
 
-        <div class="sw-form-row-meta">
-          <div class="sw-meta-field">
-            <label class="sw-field-label">Date:</label>
-            <input type="date" id="expDate" class="sw-input-date">
-          </div>
-          <div class="sw-meta-field">
-            <label class="sw-field-label">Category:</label>
-            <select id="expCategorySelect" class="sw-select-sm">
-              <option value="Food">🍽️ Food & Dining</option>
-              <option value="Transport">🚗 Transportation</option>
-              <option value="Lodging">🏠 Lodging & Rent</option>
-              <option value="Drinks">🍸 Drinks & Nightlife</option>
-              <option value="Activities">🏄 Activities & Fun</option>
-              <option value="General">🛒 General / Utilities</option>
-            </select>
-          </div>
+        <!-- Action Meta Pills (Date, Notes, Group) -->
+        <div class="sw-meta-pills-row">
+          <button type="button" class="sw-meta-pill" id="btnExpDatePill">
+            <span class="sw-pill-icon">📅</span>
+            <span id="expDatePillText">November 25, 2026</span>
+          </button>
+          <input type="date" id="expDate" class="hidden">
+
+          <button type="button" class="sw-meta-pill" id="btnExpNotesPill">
+            <span class="sw-pill-icon">📝</span>
+            <span>Add image/notes</span>
+          </button>
+        </div>
+
+        <div class="sw-meta-pills-row" style="margin-top: -6px;">
+          <button type="button" class="sw-meta-pill sw-meta-pill-group" id="btnExpGroupPill">
+            <span class="sw-pill-icon">👥</span>
+            <span id="expGroupPillText">No group</span>
+          </button>
+        </div>
+
+        <!-- Notes / Image Input Drawer (hidden by default) -->
+        <div class="sw-notes-drawer hidden" id="expNotesDrawer">
+          <textarea id="expNotes" class="sw-notes-textarea" placeholder="Add extra details, notes, or receipt URL..."></textarea>
         </div>
 
         <div class="sw-modal-footer">
