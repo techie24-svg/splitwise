@@ -1,0 +1,9 @@
+node_modules/
+.DS_Store
+*.log
+
+# Keep targets and extracted directories in repo without tracking large binaries
+targets/*
+!targets/.gitkeep
+extracted/*
+!extracted/.gitkeep
