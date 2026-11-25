@@ -1,0 +1,6 @@
+targets/
+extracted/
+analysis/
+*.db
+*.gz
+tests/

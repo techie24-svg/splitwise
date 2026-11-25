@@ -2,9 +2,11 @@
 
 A complete, production-grade implementation of the **Splitwise Core Expense & Debt Simplification System**, featuring:
 1. **Core Algorithmic Engine**: Min-Cash-Flow graph optimization reducing debt transfers to at most $N-1$ transactions.
-2. **Persistence Layer**: ACID-compliant relational storage powered by Node 24's native `node:sqlite` (`DatabaseSync`).
-3. **REST API**: Clean Express HTTP API for managing users, groups, multi-payer expenses, and debt settlements.
-4. **Interactive Web UI Dashboard**: Modern responsive UI with live settlement flow cards (`Debtor ── ₹Amount ──▶ Creditor`), net balance badges, multi-type split calculator, and 1-click settlement.
+2. **1-on-1 Direct Friend Balances**: Support for peer-to-peer non-group expenses (`group_id: 0`) and global pairwise balance tracking.
+3. **Expense Comments & Discussions**: Real-time comment threads on any group or direct bill.
+4. **Persistence Layer**: ACID-compliant relational storage powered by Node 24's native `node:sqlite` (`DatabaseSync`).
+5. **REST API**: Clean Express HTTP API for managing users, groups, friends, multi-payer expenses, and debt settlements.
+6. **Interactive Web UI Dashboard**: Modern responsive UI with live settlement flow cards (`Debtor ── ₹Amount ──▶ Creditor`), net balance badges, multi-type split calculator, and 1-click settlement.
 
 GitHub Repository: [**github.com/techie24-svg/splitwise**](https://github.com/techie24-svg/splitwise)  
 Live Production Deployment: [**splitwise-seven-rho.vercel.app**](https://splitwise-seven-rho.vercel.app)
