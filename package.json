@@ -2,14 +2,20 @@
   "name": "reverse-engineering",
   "version": "1.0.0",
   "description": "A dedicated workspace for inspecting application architecture, analyzing features without original source code, and reconstructing clean, compatible implementations.",
-  "main": "index.js",
+  "main": "src/demo.ts",
+  "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --experimental-strip-types tests/simplifyDebts.test.ts",
+    "demo": "node --experimental-strip-types src/demo.ts"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "splitwise",
+    "expense-splitter",
+    "debt-simplification",
+    "min-cash-flow"
+  ],
+  "author": "techie24-svg <yash240391@gmail.com>",
   "license": "ISC",
-  "type": "commonjs",
   "dependencies": {
     "rea-agents": "^6.10.1"
   }

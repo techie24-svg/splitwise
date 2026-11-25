@@ -1,48 +1,66 @@
-# App Reverse Engineering Workspace
+# Splitwise Reverse-Engineered Engine & Architecture
 
-A dedicated workspace for inspecting application architecture, analyzing features without original source code, and reconstructing clean, compatible implementations.
+A high-performance TypeScript implementation of the **Splitwise Core Expense & Debt Simplification Engine**, built and verified directly in this workspace.
 
-Integrated with **REA (Reverse Engineer Anything)**: [github.com/morluto/rea](https://github.com/morluto/rea).
+Pushed to GitHub: [**github.com/techie24-svg/splitwise**](https://github.com/techie24-svg/splitwise)
 
 ---
 
-## Workspace Directory Structure
+## ⚡ Quick Start
+
+```bash
+# Run the Interactive 5-Friend Trip Simulation
+npm run demo
+
+# Run Full Algorithmic Unit Tests
+npm test
+```
+
+---
+
+## 📐 The "Simplify Debts" Algorithm
+
+Splitwise's signature feature solves the **Minimum Cash Flow Problem** in a directed debt graph:
+
+1. **Net Balance Theorem**:
+   For any participant $u$, calculate their net monetary balance across all group expenses:
+   $$\text{net}[u] = \sum_{\text{paid}} \text{amount} - \sum_{\text{consumed}} \text{share}$$
+   - Positive balance ($> 0$): **Net Creditor** (gets paid back).
+   - Negative balance ($< 0$): **Net Debtor** (owes money).
+   - $\sum \text{net}[u] = 0$ (Conservation of Money).
+
+2. **Greedy Min-Cash-Flow Matching**:
+   - In each round, pair the maximum creditor with the maximum debtor.
+   - Settle $\min(\text{credit}, \text{debt})$.
+   - Deduct settled amounts and repeat until all balances reach ₹0.00.
+   - **Guaranteed bound**: Reduces any arbitrary debt graph with $N$ active people down to at most **$N - 1$ transactions** (often a 50%–80% reduction in payments).
+
+---
+
+## 📦 Directory Structure
 
 ```text
 reverse-engineering/
-├── targets/       # Place target applications here (APKs, Electron apps, .asar, binaries, WASM)
-├── extracted/     # Unpacked bundles, extracted resources, and decompiled assets
-├── analysis/      # Architecture notes, dependency graphs, and findings
-└── README.md      # This guide
+├── src/
+│   ├── models/
+│   │   └── types.ts             # Domain models (User, Group, Expense, SplitItem, Debt)
+│   ├── engine/
+│   │   ├── splitCalculator.ts   # EQUAL, EXACT, PERCENT, SHARES split logic + rounding
+│   │   └── simplifyDebts.ts     # Splitwise Min-Cash-Flow graph solver & net ledger
+│   └── demo.ts                  # Interactive 5-person trip simulation
+├── tests/
+│   └── simplifyDebts.test.ts    # Comprehensive unit tests (circular debts, precision)
+├── targets/                     # Dropped apps/binaries for inspection
+├── extracted/                   # Unpacked assets and bundles
+├── analysis/                    # Architecture logs and reverse engineering findings
+└── .agents/skills/              # Reverse Engineer Anything (REA) skill definitions
 ```
 
 ---
 
-## Setting Up REA (`morluto/rea`)
+## 🧪 Split Types Supported
 
-### Option A: Agent MCP Setup (Recommended for AI Agents)
-Run the setup wizard from a trusted directory outside the target application:
-```bash
-npx rea-agents setup
-```
-- Select your AI agent environment (e.g. Gemini CLI / Antigravity / Claude Code / Cursor).
-- Approve the configuration plan to register REA's Model Context Protocol (MCP) server.
-- Restart the agent session to activate the tools.
-
-### Option B: Global CLI Installation (Terminal Usage)
-```bash
-npm install --global rea-agents
-rea --help
-```
-
----
-
-## Workflow Guide
-
-1. **Place Target**: Place the target application or bundle inside [`targets/`](file:///Users/yagarwal/downloads/gemini%20personal/reverse-engineering/targets).
-2. **Inspect & Extract**:
-   - For Electron / JavaScript:
-     ```bash
-     npx -y rea-agents@latest analyze-javascript-application ./targets/<app> --json
-     ```
-3. **Document Findings**: Store module boundaries, API signatures, and reconstruction notes inside [`analysis/`](file:///Users/yagarwal/downloads/gemini%20personal/reverse-engineering/analysis).
+- **`EQUAL`**: Automatically handles odd-cent / paise rounding (e.g., ₹100 split 3 ways &rarr; ₹33.34, ₹33.33, ₹33.33).
+- **`EXACT`**: Validates individual amounts sum exactly to total amount.
+- **`PERCENT`**: Proportional distribution with strict 100% total validation.
+- **`SHARES`**: Weighted multi-part splits ($s_i / \sum s$).
