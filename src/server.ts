@@ -19,6 +19,22 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(rootDir, 'public')));
 
+// Ensure database is initialized with initial seed data on first run / serverless cold-start
+let initialized = false;
+app.use((req, res, next) => {
+  if (!initialized) {
+    try {
+      if (db.getGroups().length === 0) {
+        seedDatabase();
+      }
+      initialized = true;
+    } catch (e) {
+      console.error('Error auto-seeding:', e);
+    }
+  }
+  next();
+});
+
 // Helper to look up user names for nice client responses
 function getUserMap() {
   const users = db.getUsers();

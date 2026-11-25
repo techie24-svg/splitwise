@@ -5,7 +5,9 @@ import type { User, Group, Expense, Payer, SplitItem, SplitType } from '../model
 export class SplitwiseDB {
   private db: DatabaseSync;
 
-  constructor(dbPath: string = 'splitwise.db') {
+  constructor(
+    dbPath: string = process.env.DATABASE_PATH || (process.env.VERCEL ? '/tmp/splitwise.db' : 'splitwise.db')
+  ) {
     this.db = new DatabaseSync(dbPath);
     this.initSchema();
   }

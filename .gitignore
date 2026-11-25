@@ -5,6 +5,7 @@ node_modules/
 *.db-journal
 *.db-wal
 *.db-shm
+.vercel/
 
 # Keep targets and extracted directories in repo without tracking large binaries
 targets/*
