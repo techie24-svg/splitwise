@@ -1,6 +1,10 @@
 node_modules/
 .DS_Store
 *.log
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
 
 # Keep targets and extracted directories in repo without tracking large binaries
 targets/*

@@ -118,3 +118,26 @@ export function calculateSplits(
       throw new Error(`Unsupported split type: ${splitType}`);
   }
 }
+
+/**
+ * Convenience helper for equal split among a list of user IDs.
+ */
+export function calculateEqualSplit(totalAmount: number, userIds: string[]): SplitItem[] {
+  return calculateSplits(
+    totalAmount,
+    'EQUAL',
+    userIds.map((uid) => ({ userId: uid }))
+  );
+}
+
+/**
+ * Convenience helper for exact split where amounts are explicitly mapped per user ID.
+ */
+export function calculateExactSplit(totalAmount: number, userAmounts: { userId: string; amount: number }[]): SplitItem[] {
+  return calculateSplits(
+    totalAmount,
+    'EXACT',
+    userAmounts.map((ua) => ({ userId: ua.userId, value: ua.amount }))
+  );
+}
+

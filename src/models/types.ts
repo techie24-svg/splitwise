@@ -9,6 +9,15 @@ export interface User {
   avatarUrl?: string;
 }
 
+export interface Group {
+  id: string;
+  name: string;
+  description?: string;
+  currency: string;
+  members: User[];
+  createdAt: Date;
+}
+
 export type SplitType = 'EQUAL' | 'EXACT' | 'PERCENT' | 'SHARES';
 
 export interface SplitItem {
