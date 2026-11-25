@@ -10,6 +10,7 @@ export interface User {
   defaultCurrency?: string;
   passwordHash?: string;
   salt?: string;
+  googleId?: string;
 }
 
 export interface Session {

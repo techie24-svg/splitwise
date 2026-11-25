@@ -114,6 +114,10 @@ var SplitwiseDB = class {
       this.db.exec("ALTER TABLE users ADD COLUMN default_currency TEXT NOT NULL DEFAULT 'INR';");
     } catch {
     }
+    try {
+      this.db.exec("ALTER TABLE users ADD COLUMN google_id TEXT;");
+    } catch {
+    }
   }
   // --- Password Hashing Helpers ---
   hashPassword(password, salt) {
@@ -169,6 +173,51 @@ var SplitwiseDB = class {
       avatarUrl: row.avatar_url,
       defaultCurrency: row.default_currency
     };
+    const token = this.createSession(user.id);
+    return { user, token };
+  }
+  loginOrRegisterGoogleUser(data) {
+    const email = data.email.toLowerCase().trim();
+    let row = this.db.prepare(`
+      SELECT id, name, email, avatar_url, default_currency, google_id
+      FROM users
+      WHERE lower(email) = ?
+    `).get(email);
+    let user;
+    if (row) {
+      if (data.googleId && !row.google_id) {
+        this.db.prepare("UPDATE users SET google_id = ? WHERE id = ?").run(data.googleId, row.id);
+      }
+      user = {
+        id: row.id,
+        name: row.name,
+        email: row.email,
+        avatarUrl: row.avatar_url || data.avatarUrl || "\u{1F464}",
+        defaultCurrency: row.default_currency || "INR"
+      };
+    } else {
+      const id = randomUUID();
+      const salt = randomBytes(16).toString("hex");
+      const passwordHash = this.hashPassword(randomBytes(32).toString("hex"), salt);
+      const avatarUrl = data.avatarUrl || "\u{1F464}";
+      const defaultCurrency = "INR";
+      this.db.prepare(`
+        INSERT INTO users (id, name, email, password_hash, salt, avatar_url, default_currency, google_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(id, data.name, email, passwordHash, salt, avatarUrl, defaultCurrency, data.googleId || null);
+      this.logActivity({
+        userId: id,
+        type: "user_joined",
+        description: `${data.name} signed up with Google!`
+      });
+      user = {
+        id,
+        name: data.name,
+        email,
+        avatarUrl,
+        defaultCurrency
+      };
+    }
     const token = this.createSession(user.id);
     return { user, token };
   }
@@ -1054,6 +1103,39 @@ app.post("/api/auth/login", (req, res) => {
     if (!result) {
       return res.status(401).json({ success: false, error: "Invalid email or password" });
     }
+    res.json({ success: true, data: result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.post("/api/auth/google", (req, res) => {
+  try {
+    let { name, email, avatarUrl, googleId, credential } = req.body;
+    if (credential && typeof credential === "string") {
+      try {
+        const payloadBase64 = credential.split(".")[1];
+        if (payloadBase64) {
+          const decoded = JSON.parse(Buffer.from(payloadBase64, "base64").toString("utf8"));
+          email = decoded.email || email;
+          name = decoded.name || name;
+          avatarUrl = decoded.picture || avatarUrl;
+          googleId = decoded.sub || googleId;
+        }
+      } catch (jwtErr) {
+        console.warn("Could not decode Google JWT credential, falling back to body fields", jwtErr);
+      }
+    }
+    if (!email || typeof email !== "string" || !email.includes("@")) {
+      return res.status(400).json({ success: false, error: "Valid Google email is required" });
+    }
+    const resolvedName = name && typeof name === "string" && name.trim() ? name.trim() : email.split("@")[0];
+    const resolvedAvatar = avatarUrl || "\u{1F464}";
+    const result = db.loginOrRegisterGoogleUser({
+      name: resolvedName,
+      email: email.trim(),
+      avatarUrl: resolvedAvatar,
+      googleId: googleId || void 0
+    });
     res.json({ success: true, data: result });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

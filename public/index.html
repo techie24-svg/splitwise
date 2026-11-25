@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Lato:ital,wght@0,300;0,400;0,700;0,900;1,400&family=Montserrat:wght@700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Montserrat:wght@700;800;900&display=swap" rel="stylesheet">
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%235bc5a7'><path d='M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5'/></svg>">
 </head>
 <body>
@@ -41,8 +41,19 @@
         <p class="sw-hero-subtitle">
           Keep track of your shared expenses and balances with housemates, trips, groups, friends, and family.
         </p>
+
+        <!-- Dual Auth Call to Actions: Google or Email -->
         <div class="sw-hero-actions">
-          <button class="sw-btn-hero-cta" id="btnHeroSignup">Sign up</button>
+          <button class="sw-btn-google-large" id="btnHeroGoogle">
+            <svg class="sw-google-icon" viewBox="0 0 24 24" width="22" height="22">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+            </svg>
+            <span>Continue with Google</span>
+          </button>
+          <button class="sw-btn-hero-cta" id="btnHeroSignup">Sign up with email</button>
         </div>
 
         <!-- 1-Click Instant Demo Credentials -->
@@ -182,9 +193,7 @@
               <span class="sw-section-title">GROUPS</span>
               <button class="sw-btn-add-text" id="btnAddGroupLeft" title="Create new group">+ add</button>
             </div>
-            <div class="sw-sidebar-list" id="sidebarGroupsList">
-              <!-- Dynamically populated groups -->
-            </div>
+            <div class="sw-sidebar-list" id="sidebarGroupsList"></div>
           </div>
 
           <!-- FRIENDS Section -->
@@ -193,9 +202,7 @@
               <span class="sw-section-title">FRIENDS</span>
               <button class="sw-btn-add-text" id="btnAddFriendLeft" title="Add a friend">+ add</button>
             </div>
-            <div class="sw-sidebar-list" id="sidebarFriendsList">
-              <!-- Dynamically populated friends with balances -->
-            </div>
+            <div class="sw-sidebar-list" id="sidebarFriendsList"></div>
           </div>
 
           <!-- Invite Friends Widget -->
@@ -313,31 +320,48 @@
         <button class="sw-modal-close" data-close="modalLogin">&times;</button>
       </div>
 
-      <form id="formLogin" class="sw-modal-body">
-        <div class="sw-form-group">
-          <label class="sw-field-label">Email address</label>
-          <input type="email" id="loginEmail" class="sw-select-control" placeholder="you@example.com" required>
+      <div class="sw-modal-body">
+        <!-- Google Sign-in Option -->
+        <button type="button" class="sw-btn-google-full" id="btnLoginGoogle">
+          <svg class="sw-google-icon" viewBox="0 0 24 24" width="20" height="20">
+            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+          </svg>
+          <span>Sign in with Google</span>
+        </button>
+
+        <div class="sw-auth-divider">
+          <span>or log in with email</span>
         </div>
 
-        <div class="sw-form-group">
-          <label class="sw-field-label">Password</label>
-          <input type="password" id="loginPassword" class="sw-select-control" placeholder="••••••••" required>
-        </div>
-
-        <div class="sw-auth-quick-select">
-          <span class="sw-field-label" style="display:block; margin-bottom:4px;">Quick demo login:</span>
-          <div class="sw-demo-pills">
-            <button type="button" class="sw-demo-pill" onclick="quickFillLogin('yash@example.com')">👨‍💻 Yash</button>
-            <button type="button" class="sw-demo-pill" onclick="quickFillLogin('alice@example.com')">👩‍🎨 Alice</button>
-            <button type="button" class="sw-demo-pill" onclick="quickFillLogin('bob@example.com')">🏄‍♂️ Bob</button>
+        <form id="formLogin">
+          <div class="sw-form-group">
+            <label class="sw-field-label">Email address</label>
+            <input type="email" id="loginEmail" class="sw-select-control" placeholder="you@example.com" required>
           </div>
-        </div>
 
-        <div class="sw-modal-footer" style="justify-content: space-between;">
-          <a href="#" class="sw-auth-switch-link" id="linkSwitchToSignup">Don't have an account? Sign up</a>
-          <button type="submit" class="sw-btn-save-teal">Log in</button>
-        </div>
-      </form>
+          <div class="sw-form-group">
+            <label class="sw-field-label">Password</label>
+            <input type="password" id="loginPassword" class="sw-select-control" placeholder="••••••••" required>
+          </div>
+
+          <div class="sw-auth-quick-select">
+            <span class="sw-field-label" style="display:block; margin-bottom:4px;">Quick demo login:</span>
+            <div class="sw-demo-pills">
+              <button type="button" class="sw-demo-pill" onclick="quickFillLogin('yash@example.com')">👨‍💻 Yash</button>
+              <button type="button" class="sw-demo-pill" onclick="quickFillLogin('alice@example.com')">👩‍🎨 Alice</button>
+              <button type="button" class="sw-demo-pill" onclick="quickFillLogin('bob@example.com')">🏄‍♂️ Bob</button>
+            </div>
+          </div>
+
+          <div class="sw-modal-footer" style="justify-content: space-between; margin-top: 14px;">
+            <a href="#" class="sw-auth-switch-link" id="linkSwitchToSignup">Don't have an account? Sign up</a>
+            <button type="submit" class="sw-btn-save-teal">Log in</button>
+          </div>
+        </form>
+      </div>
     </div>
   </div>
 
@@ -351,37 +375,103 @@
         <button class="sw-modal-close" data-close="modalSignup">&times;</button>
       </div>
 
-      <form id="formSignup" class="sw-modal-body">
-        <div class="sw-form-group">
-          <label class="sw-field-label">Full Name</label>
-          <input type="text" id="signupName" class="sw-select-control" placeholder="e.g. Jane Doe" required>
+      <div class="sw-modal-body">
+        <!-- Google Sign-up Option -->
+        <button type="button" class="sw-btn-google-full" id="btnSignupGoogle">
+          <svg class="sw-google-icon" viewBox="0 0 24 24" width="20" height="20">
+            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+          </svg>
+          <span>Sign up with Google</span>
+        </button>
+
+        <div class="sw-auth-divider">
+          <span>or sign up with email</span>
         </div>
 
-        <div class="sw-form-group">
-          <label class="sw-field-label">Email address</label>
-          <input type="email" id="signupEmail" class="sw-select-control" placeholder="jane@example.com" required>
+        <form id="formSignup">
+          <div class="sw-form-group">
+            <label class="sw-field-label">Full Name</label>
+            <input type="text" id="signupName" class="sw-select-control" placeholder="e.g. Jane Doe" required>
+          </div>
+
+          <div class="sw-form-group">
+            <label class="sw-field-label">Email address</label>
+            <input type="email" id="signupEmail" class="sw-select-control" placeholder="jane@example.com" required>
+          </div>
+
+          <div class="sw-form-group">
+            <label class="sw-field-label">Password (at least 6 characters)</label>
+            <input type="password" id="signupPassword" class="sw-select-control" placeholder="••••••••" minlength="6" required>
+          </div>
+
+          <div class="sw-form-group">
+            <label class="sw-field-label">Default Currency</label>
+            <select id="signupCurrency" class="sw-select-control">
+              <option value="INR">INR (₹) - Indian Rupee</option>
+              <option value="USD">USD ($) - US Dollar</option>
+              <option value="EUR">EUR (€) - Euro</option>
+              <option value="GBP">GBP (£) - British Pound</option>
+            </select>
+          </div>
+
+          <div class="sw-modal-footer" style="justify-content: space-between; margin-top: 14px;">
+            <a href="#" class="sw-auth-switch-link" id="linkSwitchToLogin">Already have an account? Log in</a>
+            <button type="submit" class="sw-btn-save-teal">Sign up with email</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================== -->
+  <!-- MODAL: GOOGLE ACCOUNT CHOOSER (SIMULATED OAUTH)-->
+  <!-- ============================================== -->
+  <div class="sw-modal-overlay hidden" id="modalGoogleAccount">
+    <div class="sw-modal-dialog sw-modal-google">
+      <div class="sw-google-header">
+        <svg viewBox="0 0 24 24" width="24" height="24">
+          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+        </svg>
+        <span class="sw-google-header-text">Sign in with Google</span>
+        <button class="sw-modal-close" style="color:#666;" data-close="modalGoogleAccount">&times;</button>
+      </div>
+
+      <div class="sw-google-body">
+        <p class="sw-google-sub">Choose an account to continue to <strong>Splitwise</strong></p>
+
+        <div class="sw-google-account-list">
+          <div class="sw-google-account-item" onclick="executeGoogleLogin('Yash Agarwal', 'yash240391@gmail.com', '👨‍💻')">
+            <div class="sw-google-avatar">👨‍💻</div>
+            <div class="sw-google-acc-info">
+              <span class="sw-google-acc-name">Yash Agarwal</span>
+              <span class="sw-google-acc-email">yash240391@gmail.com</span>
+            </div>
+          </div>
+
+          <div class="sw-google-account-item" onclick="executeGoogleLogin('Alice Smith', 'alice.smith@gmail.com', '👩‍🎨')">
+            <div class="sw-google-avatar">👩‍🎨</div>
+            <div class="sw-google-acc-info">
+              <span class="sw-google-acc-name">Alice Smith</span>
+              <span class="sw-google-acc-email">alice.smith@gmail.com</span>
+            </div>
+          </div>
         </div>
 
-        <div class="sw-form-group">
-          <label class="sw-field-label">Password (at least 6 characters)</label>
-          <input type="password" id="signupPassword" class="sw-select-control" placeholder="••••••••" minlength="6" required>
+        <div class="sw-google-custom-wrap">
+          <span class="sw-field-label" style="display:block; margin-bottom:6px;">Or connect with another Google account:</span>
+          <form onsubmit="handleCustomGoogleSubmit(event)" style="display:flex; flex-direction:column; gap:8px;">
+            <input type="text" id="customGoogleName" class="sw-select-control" placeholder="Your Name" required>
+            <input type="email" id="customGoogleEmail" class="sw-select-control" placeholder="your.name@gmail.com" required>
+            <button type="submit" class="sw-btn-save-teal" style="width:100%;">Continue as Google User</button>
+          </form>
         </div>
-
-        <div class="sw-form-group">
-          <label class="sw-field-label">Default Currency</label>
-          <select id="signupCurrency" class="sw-select-control">
-            <option value="INR">INR (₹) - Indian Rupee</option>
-            <option value="USD">USD ($) - US Dollar</option>
-            <option value="EUR">EUR (€) - Euro</option>
-            <option value="GBP">GBP (£) - British Pound</option>
-          </select>
-        </div>
-
-        <div class="sw-modal-footer" style="justify-content: space-between;">
-          <a href="#" class="sw-auth-switch-link" id="linkSwitchToLogin">Already have an account? Log in</a>
-          <button type="submit" class="sw-btn-save-teal">Sign up</button>
-        </div>
-      </form>
+      </div>
     </div>
   </div>
 

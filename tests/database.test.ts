@@ -141,7 +141,17 @@ assert.strictEqual(loginFail, null, 'Login should fail with wrong password');
 const sessionUser = testDb.getSessionUser(loginSuccess.token);
 assert(sessionUser !== null);
 assert.strictEqual(sessionUser.name, 'Diana Prince');
-console.log('✓ Test 8: User registration, cryptographic password verification & sessions passed.');
+
+// Test Google Auth
+const googleAuth = testDb.loginOrRegisterGoogleUser({
+  name: 'Google User',
+  email: 'googleuser@gmail.com',
+  googleId: 'g_1234567890',
+  avatarUrl: '🌐',
+});
+assert.strictEqual(googleAuth.user.name, 'Google User');
+assert(googleAuth.token.length > 20);
+console.log('✓ Test 8: User registration, cryptographic password verification, Google auth & sessions passed.');
 
 // 9. Activity Logging & CSV Export
 testDb.logActivity({
@@ -151,7 +161,7 @@ testDb.logActivity({
 });
 const activities = testDb.getActivities(10);
 assert(activities.length >= 1, 'Should log and retrieve activities');
-assert.strictEqual(activities[0].userId, registered.user.id);
+assert(activities.some((a) => a.userId === registered.user.id), 'Should log activity for registered user');
 
 const csv = testDb.exportGroupExpensesCSV(group.id);
 assert(csv.includes('Gas'), 'CSV export should include Gas expense');

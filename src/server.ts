@@ -111,6 +111,46 @@ app.post('/api/auth/login', (req, res) => {
   }
 });
 
+app.post('/api/auth/google', (req, res) => {
+  try {
+    let { name, email, avatarUrl, googleId, credential } = req.body;
+
+    // Handle Google Identity Services JWT credential if passed
+    if (credential && typeof credential === 'string') {
+      try {
+        const payloadBase64 = credential.split('.')[1];
+        if (payloadBase64) {
+          const decoded = JSON.parse(Buffer.from(payloadBase64, 'base64').toString('utf8'));
+          email = decoded.email || email;
+          name = decoded.name || name;
+          avatarUrl = decoded.picture || avatarUrl;
+          googleId = decoded.sub || googleId;
+        }
+      } catch (jwtErr) {
+        console.warn('Could not decode Google JWT credential, falling back to body fields', jwtErr);
+      }
+    }
+
+    if (!email || typeof email !== 'string' || !email.includes('@')) {
+      return res.status(400).json({ success: false, error: 'Valid Google email is required' });
+    }
+
+    const resolvedName = name && typeof name === 'string' && name.trim() ? name.trim() : email.split('@')[0];
+    const resolvedAvatar = avatarUrl || '👤';
+
+    const result = db.loginOrRegisterGoogleUser({
+      name: resolvedName,
+      email: email.trim(),
+      avatarUrl: resolvedAvatar,
+      googleId: googleId || undefined,
+    });
+
+    res.json({ success: true, data: result });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 app.get('/api/auth/me', (req, res) => {
   try {
     const token = getAuthToken(req);

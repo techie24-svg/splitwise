@@ -136,11 +136,16 @@ const rightSidebarContent = document.getElementById('rightSidebarContent');
 // Modals
 const modalLogin = document.getElementById('modalLogin');
 const modalSignup = document.getElementById('modalSignup');
+const modalGoogleAccount = document.getElementById('modalGoogleAccount');
 const modalProfile = document.getElementById('modalProfile');
 const modalAddExpense = document.getElementById('modalAddExpense');
 const modalSettleUp = document.getElementById('modalSettleUp');
 const modalCreateGroup = document.getElementById('modalCreateGroup');
 const modalAddFriend = document.getElementById('modalAddFriend');
+
+const btnHeroGoogle = document.getElementById('btnHeroGoogle');
+const btnLoginGoogle = document.getElementById('btnLoginGoogle');
+const btnSignupGoogle = document.getElementById('btnSignupGoogle');
 
 const formLogin = document.getElementById('formLogin');
 const formSignup = document.getElementById('formSignup');
@@ -202,6 +207,17 @@ function setupEventListeners() {
   btnLandingLogin?.addEventListener('click', () => modalLogin.classList.remove('hidden'));
   btnLandingSignup?.addEventListener('click', () => modalSignup.classList.remove('hidden'));
   btnHeroSignup?.addEventListener('click', () => modalSignup.classList.remove('hidden'));
+
+  // Google Sign-in buttons
+  btnHeroGoogle?.addEventListener('click', () => modalGoogleAccount.classList.remove('hidden'));
+  btnLoginGoogle?.addEventListener('click', () => {
+    modalLogin.classList.add('hidden');
+    modalGoogleAccount.classList.remove('hidden');
+  });
+  btnSignupGoogle?.addEventListener('click', () => {
+    modalSignup.classList.add('hidden');
+    modalGoogleAccount.classList.remove('hidden');
+  });
 
   document.querySelectorAll('.sw-demo-pill').forEach((pill) => {
     pill.addEventListener('click', () => {
@@ -422,6 +438,40 @@ window.quickLogin = async function (email) {
     await loadInitialData();
   } catch (err) {
     alert('Login error: ' + err.message);
+  }
+};
+
+window.executeGoogleLogin = async function (name, email, avatarUrl) {
+  try {
+    const res = await fetch('/api/auth/google', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email, avatarUrl, googleId: `google_${Date.now()}` }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Google login failed');
+
+    authToken = data.data.token;
+    currentUser = data.data.user;
+    localStorage.setItem('splitwise_auth_token', authToken);
+
+    modalGoogleAccount?.classList.add('hidden');
+    modalLogin?.classList.add('hidden');
+    modalSignup?.classList.add('hidden');
+    showAuthenticatedUI();
+    await loadInitialData();
+  } catch (err) {
+    alert('Google login error: ' + err.message);
+  }
+};
+
+window.handleCustomGoogleSubmit = function (e) {
+  e.preventDefault();
+  const name = document.getElementById('customGoogleName')?.value.trim();
+  const email = document.getElementById('customGoogleEmail')?.value.trim();
+  if (name && email) {
+    executeGoogleLogin(name, email, '🌐');
   }
 };
 

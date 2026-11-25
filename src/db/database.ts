@@ -112,6 +112,9 @@ export class SplitwiseDB {
     try {
       this.db.exec("ALTER TABLE users ADD COLUMN default_currency TEXT NOT NULL DEFAULT 'INR';");
     } catch {}
+    try {
+      this.db.exec('ALTER TABLE users ADD COLUMN google_id TEXT;');
+    } catch {}
   }
 
   // --- Password Hashing Helpers ---
@@ -185,6 +188,63 @@ export class SplitwiseDB {
       avatarUrl: row.avatar_url,
       defaultCurrency: row.default_currency,
     };
+
+    const token = this.createSession(user.id);
+    return { user, token };
+  }
+
+  public loginOrRegisterGoogleUser(data: {
+    name: string;
+    email: string;
+    avatarUrl?: string;
+    googleId?: string;
+  }): { user: User; token: string } {
+    const email = data.email.toLowerCase().trim();
+    let row = this.db.prepare(`
+      SELECT id, name, email, avatar_url, default_currency, google_id
+      FROM users
+      WHERE lower(email) = ?
+    `).get(email) as any;
+
+    let user: User;
+
+    if (row) {
+      if (data.googleId && !row.google_id) {
+        this.db.prepare('UPDATE users SET google_id = ? WHERE id = ?').run(data.googleId, row.id);
+      }
+      user = {
+        id: row.id,
+        name: row.name,
+        email: row.email,
+        avatarUrl: row.avatar_url || data.avatarUrl || '👤',
+        defaultCurrency: row.default_currency || 'INR',
+      };
+    } else {
+      const id = randomUUID();
+      const salt = randomBytes(16).toString('hex');
+      const passwordHash = this.hashPassword(randomBytes(32).toString('hex'), salt);
+      const avatarUrl = data.avatarUrl || '👤';
+      const defaultCurrency = 'INR';
+
+      this.db.prepare(`
+        INSERT INTO users (id, name, email, password_hash, salt, avatar_url, default_currency, google_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(id, data.name, email, passwordHash, salt, avatarUrl, defaultCurrency, data.googleId || null);
+
+      this.logActivity({
+        userId: id,
+        type: 'user_joined',
+        description: `${data.name} signed up with Google!`,
+      });
+
+      user = {
+        id,
+        name: data.name,
+        email,
+        avatarUrl,
+        defaultCurrency,
+      };
+    }
 
     const token = this.createSession(user.id);
     return { user, token };

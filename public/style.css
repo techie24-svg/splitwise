@@ -28,7 +28,7 @@
   --sw-header-height: 48px;
   --sw-radius-sm: 4px;
   --sw-radius-md: 6px;
-  --sw-font: 'Lato', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --sw-font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 }
 
 * {
@@ -42,9 +42,22 @@ body {
   background-color: var(--sw-bg);
   color: var(--sw-text);
   font-size: 14px;
-  line-height: 1.45;
+  line-height: 1.5;
+  letter-spacing: -0.011em;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
   min-height: 100vh;
+}
+
+.sw-ribbon-val,
+.sw-share-amount,
+.sw-transfer-amt,
+.sw-input-amount,
+.sw-date-day,
+.sw-stat-num,
+.sw-right-big-balance {
+  font-feature-settings: 'tnum' 1, 'cv05' 1, 'cv11' 1;
 }
 
 /* ==========================================================================
@@ -1718,4 +1731,162 @@ body {
 .sw-activity-meta {
   font-size: 11px;
   color: var(--sw-text-muted);
+}
+
+
+/* ==========================================================================
+   Google Sign-In & Sign-Up Elements
+   ========================================================================== */
+.sw-btn-google-large {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background-color: #ffffff;
+  color: #1f2937;
+  border: 1px solid #dadce0;
+  border-radius: var(--sw-radius-md);
+  padding: 12px 28px;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.15);
+  transition: all 0.15s ease;
+}
+.sw-btn-google-large:hover {
+  background-color: #f8fafd;
+  border-color: #c2d7fa;
+  box-shadow: 0 3px 8px rgba(60, 64, 67, 0.2);
+  transform: translateY(-1px);
+}
+
+.sw-btn-google-full {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background-color: #ffffff;
+  color: #374151;
+  border: 1px solid #d1d5db;
+  border-radius: var(--sw-radius-sm);
+  padding: 10px 16px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  transition: all 0.15s ease;
+}
+.sw-btn-google-full:hover {
+  background-color: #f9fafb;
+  border-color: #9ca3af;
+}
+
+.sw-auth-divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin: 14px 0 12px;
+}
+.sw-auth-divider::before,
+.sw-auth-divider::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid #e5e7eb;
+}
+.sw-auth-divider span {
+  padding: 0 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Google Account Chooser Modal */
+.sw-modal-google {
+  width: 440px;
+  border-radius: 8px;
+  background-color: #ffffff;
+}
+
+.sw-google-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sw-google-header-text {
+  font-size: 16px;
+  font-weight: 600;
+  color: #202124;
+  flex: 1;
+}
+
+.sw-google-body {
+  padding: 20px;
+}
+
+.sw-google-sub {
+  font-size: 14px;
+  color: #5f6368;
+  margin-bottom: 16px;
+}
+
+.sw-google-account-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.sw-google-account-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 1px solid #dadce0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+.sw-google-account-item:hover {
+  background-color: #f8fafd;
+  border-color: #4285f4;
+}
+
+.sw-google-avatar {
+  font-size: 24px;
+  width: 36px;
+  height: 36px;
+  background-color: #e8f0fe;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sw-google-acc-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.sw-google-acc-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #202124;
+}
+
+.sw-google-acc-email {
+  font-size: 12px;
+  color: #5f6368;
+}
+
+.sw-google-custom-wrap {
+  border-top: 1px dashed #e5e7eb;
+  padding-top: 14px;
 }
