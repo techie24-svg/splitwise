@@ -1,91 +1,113 @@
 /**
- * Splitwise Core Interactive Dashboard Client
- * Supports: Groups, 1-on-1 Friends, Min-Cash-Flow Simplification, and Expense Comments
+ * Splitwise Web Authentic Client
+ * Built via REA (Reverse-Engineer-Anything) on Splitwise Web Application
+ * Features:
+ * - 3-Column Splitwise Desktop UI (Left nav, Center feed, Right balances)
+ * - Greedy Min-Cash-Flow Debt Simplification (O(N) vs O(N^2))
+ * - Dynamic Group & 1-on-1 Friend Ledgers
+ * - Split Modes: Equal, Exact, Percent, Shares
+ * - Live Expense Comments Thread & Realtime Balances
  */
 
-// State
-let groups = [];
-let activeGroup = null;
+// Global State
 let allUsers = [];
+let groups = [];
 let friends = [];
-let activeFriend = null;
 let currentUserId = null;
-let expenses = [];
-let settlementData = null;
-let activeTab = 'groups'; // 'groups' | 'friends'
-let viewMode = 'simplified'; // 'simplified' | 'unsimplified'
+let currentView = 'dashboard'; // 'dashboard' | 'activity' | 'expenses' | 'group' | 'friend'
+let activeGroupId = null;
+let activeFriendId = null;
+let activeGroup = null;
+let activeFriend = null;
+let currentExpenses = [];
+let groupSettlement = null;
+let feedTab = 'expenses'; // 'expenses' | 'simplification'
+let simplificationMode = 'simplified'; // 'simplified' | 'unsimplified'
 
-// Category Icons
-const categoryIcons = {
+// Category Icons & Helpers
+const CATEGORY_ICONS = {
   Food: '🍽️',
-  Lodging: '🏠',
   Transport: '🚗',
-  Activities: '🏄',
+  Lodging: '🏠',
   Drinks: '🍸',
+  Activities: '🏄',
   Payment: '🤝',
   General: '🛒',
 };
 
-// Currency Formatter
 function formatCurrency(amount, currency = 'INR') {
-  const symbol = currency === 'INR' ? '₹' : currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency + ' ';
-  return `${symbol}${Number(amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const sym = currency === 'INR' ? '₹' : currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency + ' ';
+  const num = Math.abs(Number(amount) || 0);
+  return `${sym}${num.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function parseMonthDay(dateStr) {
+  const d = dateStr ? new Date(dateStr) : new Date();
+  const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+  return {
+    month: months[d.getMonth()],
+    day: d.getDate(),
+  };
 }
 
 // DOM Elements
-const tabGroups = document.getElementById('tabGroups');
-const tabFriends = document.getElementById('tabFriends');
+const brandHomeLink = document.getElementById('brandHomeLink');
+const btnUserMenuToggle = document.getElementById('btnUserMenuToggle');
+const userDropdownMenu = document.getElementById('userDropdownMenu');
+const headerUserAvatar = document.getElementById('headerUserAvatar');
+const headerUserName = document.getElementById('headerUserName');
 const currentUserSelect = document.getElementById('currentUserSelect');
-const groupActionsWrapper = document.getElementById('groupActionsWrapper');
-const friendActionsWrapper = document.getElementById('friendActionsWrapper');
 
-const groupSelect = document.getElementById('groupSelect');
-const friendSelect = document.getElementById('friendSelect');
-const btnNewExpense = document.getElementById('btnNewExpense');
-const btnNewDirectExpense = document.getElementById('btnNewDirectExpense');
-const btnNewGroup = document.getElementById('btnNewGroup');
-const btnNewFriend = document.getElementById('btnNewFriend');
-const btnReseed = document.getElementById('btnReseed');
-const btnQuickSettle = document.getElementById('btnQuickSettle');
+const navDashboard = document.getElementById('navDashboard');
+const navRecentActivity = document.getElementById('navRecentActivity');
+const navAllExpenses = document.getElementById('navAllExpenses');
 
-const toggleSimplified = document.getElementById('toggleSimplified');
-const toggleUnsimplified = document.getElementById('toggleUnsimplified');
-const viewToggleWrapper = document.getElementById('viewToggleWrapper');
+const sidebarGroupsList = document.getElementById('sidebarGroupsList');
+const sidebarFriendsList = document.getElementById('sidebarFriendsList');
+const btnAddGroupLeft = document.getElementById('btnAddGroupLeft');
+const btnAddFriendLeft = document.getElementById('btnAddFriendLeft');
+const btnOpenGroupModal = document.getElementById('btnOpenGroupModal');
+const btnOpenFriendModal = document.getElementById('btnOpenFriendModal');
+const btnReseedDemo = document.getElementById('btnReseedDemo');
 
-const metricTotalSpend = document.getElementById('metricTotalSpend');
-const metricExpenseCount = document.getElementById('metricExpenseCount');
-const metricDebtVolume = document.getElementById('metricDebtVolume');
-const metricUnsimplifiedCount = document.getElementById('metricUnsimplifiedCount');
-const metricOptimization = document.getElementById('metricOptimization');
-const metricSimplifiedCount = document.getElementById('metricSimplifiedCount');
-const metricMemberCount = document.getElementById('metricMemberCount');
-const metricCurrency = document.getElementById('metricCurrency');
+const topbarViewIcon = document.getElementById('topbarViewIcon');
+const centerTitle = document.getElementById('centerTitle');
+const centerSubtitle = document.getElementById('centerSubtitle');
+const btnOpenExpenseModal = document.getElementById('btnOpenExpenseModal');
+const btnOpenSettleModal = document.getElementById('btnOpenSettleModal');
 
-const metricLabel1 = document.getElementById('metricLabel1');
-const metricLabel2 = document.getElementById('metricLabel2');
-const metricLabel3 = document.getElementById('metricLabel3');
-const metricLabel4 = document.getElementById('metricLabel4');
+const ribbonTotalBalance = document.getElementById('ribbonTotalBalance');
+const ribbonTotalBalanceSub = document.getElementById('ribbonTotalBalanceSub');
+const ribbonYouOwe = document.getElementById('ribbonYouOwe');
+const ribbonYouOweSub = document.getElementById('ribbonYouOweSub');
+const ribbonYouAreOwed = document.getElementById('ribbonYouAreOwed');
+const ribbonYouAreOwedSub = document.getElementById('ribbonYouAreOwedSub');
 
-const leftColumnTitle = document.getElementById('leftColumnTitle');
-const leftColumnDesc = document.getElementById('leftColumnDesc');
-const rightColumnTitle = document.getElementById('rightColumnTitle');
-const rightColumnDesc = document.getElementById('rightColumnDesc');
+const tabViewExpenses = document.getElementById('tabViewExpenses');
+const tabViewSimplification = document.getElementById('tabViewSimplification');
+const simplificationToggles = document.getElementById('simplificationToggles');
+const btnModeSimplified = document.getElementById('btnModeSimplified');
+const btnModeUnsimplified = document.getElementById('btnModeUnsimplified');
 
-const debtsContainer = document.getElementById('debtsContainer');
-const netBalancesContainer = document.getElementById('netBalancesContainer');
-const expensesTimeline = document.getElementById('expensesTimeline');
+const expensesFeed = document.getElementById('expensesFeed');
+const simplificationFeed = document.getElementById('simplificationFeed');
+const simplificationTransfersList = document.getElementById('simplificationTransfersList');
+const statReductionPct = document.getElementById('statReductionPct');
+const statTransfersCount = document.getElementById('statTransfersCount');
+const statTotalVolume = document.getElementById('statTotalVolume');
+
+const rightSidebarContent = document.getElementById('rightSidebarContent');
 
 // Modals
-const modalExpense = document.getElementById('modalExpense');
-const modalSettle = document.getElementById('modalSettle');
-const modalGroup = document.getElementById('modalGroup');
-const modalFriend = document.getElementById('modalFriend');
+const modalAddExpense = document.getElementById('modalAddExpense');
+const modalSettleUp = document.getElementById('modalSettleUp');
+const modalCreateGroup = document.getElementById('modalCreateGroup');
+const modalAddFriend = document.getElementById('modalAddFriend');
 
-// Forms
-const formExpense = document.getElementById('formExpense');
-const formSettle = document.getElementById('formSettle');
-const formGroup = document.getElementById('formGroup');
-const formFriend = document.getElementById('formFriend');
+const formAddExpense = document.getElementById('formAddExpense');
+const formSettleUp = document.getElementById('formSettleUp');
+const formCreateGroup = document.getElementById('formCreateGroup');
+const formAddFriend = document.getElementById('formAddFriend');
 
 // Init
 document.addEventListener('DOMContentLoaded', async () => {
@@ -93,78 +115,96 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadInitialData();
 });
 
+// Event Listeners
 function setupEventListeners() {
-  // Tab Switching: Groups vs Friends
-  tabGroups.addEventListener('click', () => {
-    activeTab = 'groups';
-    tabGroups.classList.add('active');
-    tabFriends.classList.remove('active');
-    groupActionsWrapper.classList.remove('hidden');
-    friendActionsWrapper.classList.add('hidden');
-    viewToggleWrapper.classList.remove('hidden');
-    refreshActiveView();
+  // Brand Logo Click -> Return to Dashboard
+  brandHomeLink.addEventListener('click', () => switchView('dashboard'));
+
+  // User Profile Dropdown
+  btnUserMenuToggle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    userDropdownMenu.classList.toggle('hidden');
   });
 
-  tabFriends.addEventListener('click', () => {
-    activeTab = 'friends';
-    tabFriends.classList.add('active');
-    tabGroups.classList.remove('active');
-    groupActionsWrapper.classList.add('hidden');
-    friendActionsWrapper.classList.remove('hidden');
-    viewToggleWrapper.classList.add('hidden');
-    refreshActiveView();
+  window.addEventListener('click', (e) => {
+    if (!userDropdownMenu.contains(e.target) && !btnUserMenuToggle.contains(e.target)) {
+      userDropdownMenu.classList.add('hidden');
+    }
   });
 
-  // User Switcher
+  // Switch User
   currentUserSelect.addEventListener('change', async (e) => {
     currentUserId = e.target.value;
-    await refreshActiveView();
+    updateCurrentUserUI();
+    await reloadCurrentView();
   });
 
-  // Group Switcher
-  groupSelect.addEventListener('change', async (e) => {
-    const selectedId = e.target.value;
-    activeGroup = groups.find((g) => g.id === selectedId) || null;
-    await refreshGroupData();
+  // Primary Nav
+  navDashboard.addEventListener('click', () => switchView('dashboard'));
+  navRecentActivity.addEventListener('click', () => switchView('activity'));
+  navAllExpenses.addEventListener('click', () => switchView('expenses'));
+
+  // Left Sidebar Action buttons
+  btnAddGroupLeft.addEventListener('click', openGroupModal);
+  btnAddFriendLeft.addEventListener('click', openFriendModal);
+  btnOpenGroupModal.addEventListener('click', () => {
+    userDropdownMenu.classList.add('hidden');
+    openGroupModal();
+  });
+  btnOpenFriendModal.addEventListener('click', () => {
+    userDropdownMenu.classList.add('hidden');
+    openFriendModal();
   });
 
-  // Friend Switcher
-  friendSelect.addEventListener('change', async (e) => {
-    const selectedId = e.target.value;
-    activeFriend = friends.find((f) => f.friend.id === selectedId) || null;
-    await refreshFriendData();
-  });
-
-  // Debt View Toggle
-  toggleSimplified.addEventListener('click', () => {
-    viewMode = 'simplified';
-    toggleSimplified.classList.add('active');
-    toggleUnsimplified.classList.remove('active');
-    renderDebts();
-  });
-
-  toggleUnsimplified.addEventListener('click', () => {
-    viewMode = 'unsimplified';
-    toggleUnsimplified.classList.add('active');
-    toggleSimplified.classList.remove('active');
-    renderDebts();
-  });
-
-  btnReseed.addEventListener('click', async () => {
-    if (confirm('Reset database to the Goa Beach Trip demo dataset?')) {
+  // Reseed Demo Data
+  btnReseedDemo.addEventListener('click', async () => {
+    userDropdownMenu.classList.add('hidden');
+    if (confirm('Reset database to the official Goa Beach Trip Splitwise demo?')) {
       await fetch('/api/seed', { method: 'POST' });
       await loadInitialData();
     }
   });
 
-  // Modal Openers
-  btnNewExpense.addEventListener('click', () => openExpenseModal('group'));
-  btnNewDirectExpense.addEventListener('click', () => openExpenseModal('friend'));
-  btnQuickSettle.addEventListener('click', () => openSettleModal());
-  btnNewGroup.addEventListener('click', () => openGroupModal());
-  btnNewFriend.addEventListener('click', () => openFriendModal());
+  // Main Topbar Action Buttons
+  btnOpenExpenseModal.addEventListener('click', () => openExpenseModal());
+  btnOpenSettleModal.addEventListener('click', () => openSettleModal());
 
-  // Modal Close buttons
+  // Center Feed Tab Switching
+  tabViewExpenses.addEventListener('click', () => {
+    feedTab = 'expenses';
+    tabViewExpenses.classList.add('active');
+    tabViewSimplification.classList.remove('active');
+    expensesFeed.classList.remove('hidden');
+    simplificationFeed.classList.add('hidden');
+    simplificationToggles.classList.add('hidden');
+  });
+
+  tabViewSimplification.addEventListener('click', () => {
+    feedTab = 'simplification';
+    tabViewSimplification.classList.add('active');
+    tabViewExpenses.classList.remove('active');
+    expensesFeed.classList.add('hidden');
+    simplificationFeed.classList.remove('hidden');
+    simplificationToggles.classList.remove('hidden');
+    renderSimplificationFeed();
+  });
+
+  // Simplification Mode Toggle
+  btnModeSimplified.addEventListener('click', () => {
+    simplificationMode = 'simplified';
+    btnModeSimplified.classList.add('active');
+    btnModeUnsimplified.classList.remove('active');
+    renderSimplificationFeed();
+  });
+
+  btnModeUnsimplified.addEventListener('click', () => {
+    simplificationMode = 'unsimplified';
+    btnModeUnsimplified.classList.add('active');
+    btnModeSimplified.classList.remove('active');
+    renderSimplificationFeed();
+  });
+
+  // Modal Closers
   document.querySelectorAll('[data-close]').forEach((btn) => {
     btn.addEventListener('click', () => {
       const modalId = btn.getAttribute('data-close');
@@ -172,25 +212,61 @@ function setupEventListeners() {
     });
   });
 
-  window.addEventListener('click', (e) => {
-    if (e.target.classList.contains('modal-backdrop')) {
-      e.target.classList.add('hidden');
-    }
+  document.querySelectorAll('.sw-modal-overlay').forEach((overlay) => {
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) {
+        overlay.classList.add('hidden');
+      }
+    });
   });
 
-  document.querySelectorAll('input[name="splitType"]').forEach((radio) => {
-    radio.addEventListener('change', () => renderParticipantsSplitInputs(radio.value));
+  // Expense Modal Category Selector
+  const expCategorySelect = document.getElementById('expCategorySelect');
+  const selectedCategoryIcon = document.getElementById('selectedCategoryIcon');
+  const expCategory = document.getElementById('expCategory');
+
+  expCategorySelect?.addEventListener('change', (e) => {
+    const cat = e.target.value;
+    expCategory.value = cat;
+    selectedCategoryIcon.innerText = CATEGORY_ICONS[cat] || '🛒';
   });
 
-  document.getElementById('expScope')?.addEventListener('change', (e) => {
-    updateExpenseModalParticipants(e.target.value);
+  // Expense Modal Split Options
+  const btnToggleSplitType = document.getElementById('btnToggleSplitType');
+  const splitTabsWrap = document.getElementById('splitTabsWrap');
+  btnToggleSplitType?.addEventListener('click', () => {
+    splitTabsWrap.classList.toggle('hidden');
+  });
+
+  document.querySelectorAll('.sw-split-tab').forEach((tab) => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.sw-split-tab').forEach((t) => t.classList.remove('active'));
+      tab.classList.add('active');
+      const type = tab.getAttribute('data-type');
+      document.getElementById('activeSplitType').value = type;
+      btnToggleSplitType.innerText = type === 'EQUAL' ? 'equally' : type.toLowerCase();
+      renderParticipantSplitRows(type);
+    });
+  });
+
+  document.getElementById('modalExpContext')?.addEventListener('change', (e) => {
+    updateExpenseModalParticipants();
   });
 
   // Form Submissions
-  formExpense.addEventListener('submit', handleExpenseSubmit);
-  formSettle.addEventListener('submit', handleSettleSubmit);
-  formGroup.addEventListener('submit', handleGroupSubmit);
-  formFriend.addEventListener('submit', handleFriendSubmit);
+  formAddExpense.addEventListener('submit', handleExpenseSubmit);
+  formSettleUp.addEventListener('submit', handleSettleSubmit);
+  formCreateGroup.addEventListener('submit', handleGroupSubmit);
+  formAddFriend.addEventListener('submit', handleFriendSubmit);
+
+  // Invite Button
+  document.getElementById('btnSendInvite')?.addEventListener('click', () => {
+    const input = document.getElementById('inviteEmailInput');
+    if (input.value.trim()) {
+      alert(`Invitation sent to ${input.value.trim()}!`);
+      input.value = '';
+    }
+  });
 }
 
 // Initial Data Fetch
@@ -204,54 +280,178 @@ async function loadInitialData() {
     allUsers = usersRes.data || [];
     groups = groupsRes.data || [];
 
-    // Current User Selector
+    // Setup Current User
+    if (allUsers.length > 0) {
+      if (!currentUserId || !allUsers.some((u) => u.id === currentUserId)) {
+        currentUserId = allUsers[0].id;
+      }
+    }
+
+    // Populate Current User Selector
     currentUserSelect.innerHTML = allUsers
       .map((u) => `<option value="${u.id}">${u.avatarUrl || '👤'} ${u.name}</option>`)
       .join('');
+    currentUserSelect.value = currentUserId;
 
-    if (allUsers.length > 0 && !currentUserId) {
-      currentUserId = allUsers[0].id;
-      currentUserSelect.value = currentUserId;
-    }
+    updateCurrentUserUI();
 
-    // Group Select
-    groupSelect.innerHTML = groups.map((g) => `<option value="${g.id}">${g.name}</option>`).join('');
-    if (groups.length > 0) {
-      activeGroup = groups[0];
-      groupSelect.value = activeGroup.id;
-    }
+    // Fetch Friends for Current User
+    await reloadFriends();
 
-    await refreshActiveView();
+    // Default to Dashboard
+    await switchView('dashboard');
   } catch (err) {
-    console.error('Error loading initial data:', err);
+    console.error('Error loading initial Splitwise data:', err);
   }
 }
 
-async function refreshActiveView() {
-  if (activeTab === 'groups') {
-    await refreshGroupData();
+function updateCurrentUserUI() {
+  const user = allUsers.find((u) => u.id === currentUserId);
+  if (user) {
+    headerUserAvatar.innerText = user.avatarUrl || '👤';
+    headerUserName.innerText = user.name;
+    currentUserSelect.value = user.id;
+  }
+}
+
+async function reloadFriends() {
+  if (!currentUserId) return;
+  try {
+    const res = await fetch(`/api/friends?userId=${currentUserId}`).then((r) => r.json());
+    friends = res.data || [];
+  } catch (err) {
+    console.error('Error fetching friends:', err);
+  }
+}
+
+// View Switching
+async function switchView(viewName, targetId = null) {
+  currentView = viewName;
+  activeGroupId = null;
+  activeFriendId = null;
+
+  // Clear sidebar active highlights
+  document.querySelectorAll('.sw-nav-item').forEach((n) => n.classList.remove('active'));
+  document.querySelectorAll('.sw-list-item').forEach((l) => l.classList.remove('active'));
+
+  // Reset feed tab to expenses
+  feedTab = 'expenses';
+  tabViewExpenses.classList.add('active');
+  tabViewSimplification.classList.remove('active');
+  expensesFeed.classList.remove('hidden');
+  simplificationFeed.classList.add('hidden');
+  simplificationToggles.classList.add('hidden');
+
+  if (viewName === 'dashboard') {
+    navDashboard.classList.add('active');
+    await loadDashboardView();
+  } else if (viewName === 'activity' || viewName === 'expenses') {
+    if (viewName === 'activity') navRecentActivity.classList.add('active');
+    else navAllExpenses.classList.add('active');
+    await loadAllExpensesView(viewName);
+  } else if (viewName === 'group') {
+    activeGroupId = targetId;
+    activeGroup = groups.find((g) => g.id === targetId) || null;
+    const groupEl = document.querySelector(`[data-group-id="${targetId}"]`);
+    if (groupEl) groupEl.classList.add('active');
+    await loadGroupView();
+  } else if (viewName === 'friend') {
+    activeFriendId = targetId;
+    activeFriend = friends.find((f) => f.friend.id === targetId) || null;
+    const friendEl = document.querySelector(`[data-friend-id="${targetId}"]`);
+    if (friendEl) friendEl.classList.add('active');
+    await loadFriendView();
+  }
+
+  renderLeftSidebar();
+}
+
+async function reloadCurrentView() {
+  await reloadFriends();
+  if (currentView === 'group' && activeGroupId) {
+    await switchView('group', activeGroupId);
+  } else if (currentView === 'friend' && activeFriendId) {
+    await switchView('friend', activeFriendId);
   } else {
-    await refreshFriendData();
+    await switchView(currentView);
   }
 }
 
-// Group View Data Refresh
-async function refreshGroupData() {
+// 1. Dashboard View
+async function loadDashboardView() {
+  topbarViewIcon.innerText = '📊';
+  centerTitle.innerText = 'Dashboard';
+  centerSubtitle.innerText = 'Overall balance and recent activity';
+  tabViewSimplification.classList.add('hidden');
+
+  // Fetch all user expenses
+  const allExpRes = await fetch('/api/expenses').then((r) => r.json());
+  currentExpenses = allExpRes.data || [];
+
+  // Compute Overall Balances across all friends
+  let totalYouAreOwed = 0;
+  let totalYouOwe = 0;
+  let oweCount = 0;
+  let owedCount = 0;
+
+  for (const f of friends) {
+    if (f.netBalance > 0.005) {
+      totalYouAreOwed += f.netBalance;
+      owedCount++;
+    } else if (f.netBalance < -0.005) {
+      totalYouOwe += Math.abs(f.netBalance);
+      oweCount++;
+    }
+  }
+
+  const netTotal = totalYouAreOwed - totalYouOwe;
+
+  if (Math.abs(netTotal) < 0.005) {
+    ribbonTotalBalance.innerText = '₹0.00';
+    ribbonTotalBalance.className = 'sw-ribbon-val';
+    ribbonTotalBalanceSub.innerText = 'all settled up';
+  } else if (netTotal > 0) {
+    ribbonTotalBalance.innerText = `+${formatCurrency(netTotal)}`;
+    ribbonTotalBalance.className = 'sw-ribbon-val text-teal';
+    ribbonTotalBalanceSub.innerText = 'you are owed overall';
+  } else {
+    ribbonTotalBalance.innerText = `-${formatCurrency(Math.abs(netTotal))}`;
+    ribbonTotalBalance.className = 'sw-ribbon-val text-orange';
+    ribbonTotalBalanceSub.innerText = 'you owe overall';
+  }
+
+  ribbonYouOwe.innerText = formatCurrency(totalYouOwe);
+  ribbonYouOweSub.innerText = oweCount === 1 ? 'to 1 person' : `to ${oweCount} people`;
+
+  ribbonYouAreOwed.innerText = formatCurrency(totalYouAreOwed);
+  ribbonYouAreOwedSub.innerText = owedCount === 1 ? 'from 1 person' : `from ${owedCount} people`;
+
+  renderExpensesFeed();
+  renderDashboardRightSidebar(netTotal, totalYouOwe, totalYouAreOwed);
+}
+
+// 2. All Expenses View
+async function loadAllExpensesView(mode = 'expenses') {
+  topbarViewIcon.innerText = mode === 'activity' ? '⚡' : '📜';
+  centerTitle.innerText = mode === 'activity' ? 'Recent activity' : 'All expenses';
+  centerSubtitle.innerText = 'Complete timeline of bills and payments';
+  tabViewSimplification.classList.add('hidden');
+
+  const allExpRes = await fetch('/api/expenses').then((r) => r.json());
+  currentExpenses = allExpRes.data || [];
+
+  renderExpensesFeed();
+  renderDashboardRightSidebar(0, 0, 0);
+}
+
+// 3. Group View
+async function loadGroupView() {
   if (!activeGroup) return;
 
-  leftColumnTitle.innerText = 'Settlement Transfers';
-  leftColumnDesc.innerText = 'How to settle all debts with minimum transactions';
-  rightColumnTitle.innerText = `Expense History (${activeGroup.name})`;
-  rightColumnDesc.innerText = 'Itemized breakdown of group activities, splits & discussions';
-
-  metricLabel1.innerText = 'Total Group Spend';
-  metricLabel2.innerText = 'Debt Volume';
-  metricLabel3.innerText = 'Min-Cash-Flow Efficiency';
-  metricLabel4.innerText = 'Group Members';
-
-  const currency = activeGroup.currency || 'INR';
-  metricCurrency.innerText = `Currency: ${currency}`;
-  metricMemberCount.innerText = activeGroup.members.length;
+  topbarViewIcon.innerText = '🌴';
+  centerTitle.innerText = activeGroup.name;
+  centerSubtitle.innerText = `${activeGroup.description || 'Shared Ledger'} • ${activeGroup.members.length} members`;
+  tabViewSimplification.classList.remove('hidden');
 
   try {
     const [expRes, settleRes] = await Promise.all([
@@ -259,171 +459,270 @@ async function refreshGroupData() {
       fetch(`/api/groups/${activeGroup.id}/settlement`).then((r) => r.json()),
     ]);
 
-    expenses = expRes.data || [];
-    settlementData = settleRes.data || null;
+    currentExpenses = expRes.data || [];
+    groupSettlement = settleRes.data || null;
 
-    renderGroupMetrics();
-    renderDebts();
-    renderNetBalances();
-    renderExpenses();
+    // Calculate user's net position in this group
+    const myBalanceObj = groupSettlement?.netBalances?.find((b) => b.userId === currentUserId);
+    const myNetInGroup = myBalanceObj ? myBalanceObj.balance : 0;
+
+    if (Math.abs(myNetInGroup) < 0.005) {
+      ribbonTotalBalance.innerText = '₹0.00';
+      ribbonTotalBalance.className = 'sw-ribbon-val';
+      ribbonTotalBalanceSub.innerText = 'settled up in this group';
+    } else if (myNetInGroup > 0) {
+      ribbonTotalBalance.innerText = `+${formatCurrency(myNetInGroup, activeGroup.currency)}`;
+      ribbonTotalBalance.className = 'sw-ribbon-val text-teal';
+      ribbonTotalBalanceSub.innerText = 'you are owed in this group';
+    } else {
+      ribbonTotalBalance.innerText = `-${formatCurrency(Math.abs(myNetInGroup), activeGroup.currency)}`;
+      ribbonTotalBalance.className = 'sw-ribbon-val text-orange';
+      ribbonTotalBalanceSub.innerText = 'you owe in this group';
+    }
+
+    const groupSpend = currentExpenses.reduce((sum, e) => sum + (e.category === 'Payment' ? 0 : e.totalAmount), 0);
+    ribbonYouOwe.innerText = formatCurrency(groupSpend, activeGroup.currency);
+    ribbonYouOweSub.innerText = `${currentExpenses.length} bills recorded`;
+
+    const stats = groupSettlement?.stats;
+    ribbonYouAreOwed.innerText = `${stats?.reductionPercentage || 0}%`;
+    ribbonYouAreOwedSub.innerText = `Min-cash-flow reduction`;
+
+    renderExpensesFeed();
+    renderGroupRightSidebar();
   } catch (err) {
-    console.error('Error refreshing group data:', err);
+    console.error('Error loading group view:', err);
   }
 }
 
-function renderGroupMetrics() {
-  const currency = activeGroup?.currency || 'INR';
-  const totalSpend = expenses.reduce((sum, e) => sum + (e.category === 'Payment' ? 0 : e.totalAmount), 0);
-  const expenseCount = expenses.filter((e) => e.category !== 'Payment').length;
+// 4. Friend View
+async function loadFriendView() {
+  if (!activeFriend) return;
 
-  metricTotalSpend.innerText = formatCurrency(totalSpend, currency);
-  metricExpenseCount.innerText = `${expenseCount} bills recorded`;
-
-  if (settlementData) {
-    const stats = settlementData.stats;
-    metricDebtVolume.innerText = formatCurrency(stats.totalVolume, currency);
-    metricUnsimplifiedCount.innerText = `${stats.unsimplifiedCount} peer-to-peer transfers`;
-    metricOptimization.innerText = `${stats.reductionPercentage}% Reduction`;
-    metricSimplifiedCount.innerText = `Optimized to ${stats.simplifiedCount} transfers`;
-  }
-}
-
-// Friend View Data Refresh
-async function refreshFriendData() {
-  leftColumnTitle.innerText = '1-on-1 Friends & Balances';
-  leftColumnDesc.innerText = 'Direct pairwise balances across all shared expenses';
-  rightColumnTitle.innerText = activeFriend ? `1-on-1 History with ${activeFriend.friend.name}` : 'Direct Friend Expenses';
-  rightColumnDesc.innerText = 'Itemized shared bills, payments & comments';
-
-  metricLabel1.innerText = 'Direct 1:1 Spend';
-  metricLabel2.innerText = 'You Are Owed';
-  metricLabel3.innerText = 'You Owe';
-  metricLabel4.innerText = 'Connected Friends';
+  topbarViewIcon.innerText = activeFriend.friend.avatarUrl || '👤';
+  centerTitle.innerText = activeFriend.friend.name;
+  centerSubtitle.innerText = `Direct 1-on-1 balances and expenses`;
+  tabViewSimplification.classList.add('hidden');
 
   try {
-    const friendsRes = await fetch(`/api/friends?userId=${currentUserId}`).then((r) => r.json());
-    friends = friendsRes.data || [];
+    const expRes = await fetch(`/api/friends/${activeFriend.friend.id}/expenses?userId=${currentUserId}`).then((r) =>
+      r.json()
+    );
+    currentExpenses = expRes.data || [];
 
-    // Populate Friend Selector
-    friendSelect.innerHTML = friends
-      .map((f) => `<option value="${f.friend.id}">${f.friend.name}</option>`)
-      .join('');
-
-    if (friends.length > 0) {
-      if (!activeFriend || !friends.some((f) => f.friend.id === activeFriend.friend.id)) {
-        activeFriend = friends[0];
-      }
-      friendSelect.value = activeFriend.friend.id;
-
-      // Fetch Direct 1:1 Expenses
-      const expRes = await fetch(`/api/friends/${activeFriend.friend.id}/expenses?userId=${currentUserId}`).then((r) =>
-        r.json()
-      );
-      expenses = expRes.data || [];
+    const bal = activeFriend.netBalance || 0;
+    if (Math.abs(bal) < 0.005) {
+      ribbonTotalBalance.innerText = '₹0.00';
+      ribbonTotalBalance.className = 'sw-ribbon-val';
+      ribbonTotalBalanceSub.innerText = 'you two are all settled up';
+    } else if (bal > 0) {
+      ribbonTotalBalance.innerText = `+${formatCurrency(bal)}`;
+      ribbonTotalBalance.className = 'sw-ribbon-val text-teal';
+      ribbonTotalBalanceSub.innerText = `${activeFriend.friend.name} owes you`;
     } else {
-      activeFriend = null;
-      expenses = [];
+      ribbonTotalBalance.innerText = `-${formatCurrency(Math.abs(bal))}`;
+      ribbonTotalBalance.className = 'sw-ribbon-val text-orange';
+      ribbonTotalBalanceSub.innerText = `you owe ${activeFriend.friend.name}`;
     }
 
-    renderFriendMetrics();
-    renderFriendCards();
-    renderFriendNetBalances();
-    renderExpenses();
+    const directSpend = currentExpenses.reduce((sum, e) => sum + (e.category === 'Payment' ? 0 : e.totalAmount), 0);
+    ribbonYouOwe.innerText = formatCurrency(directSpend);
+    ribbonYouOweSub.innerText = 'total direct spend';
+
+    ribbonYouAreOwed.innerText = `${currentExpenses.length}`;
+    ribbonYouAreOwedSub.innerText = 'shared transactions';
+
+    renderExpensesFeed();
+    renderFriendRightSidebar();
   } catch (err) {
-    console.error('Error refreshing friend data:', err);
+    console.error('Error loading friend view:', err);
   }
 }
 
-function renderFriendMetrics() {
-  const currency = 'INR';
-  metricMemberCount.innerText = friends.length;
-  metricCurrency.innerText = 'Direct 1:1 Mode';
+// Render Left Sidebar (Groups & Friends lists)
+function renderLeftSidebar() {
+  // Groups List
+  sidebarGroupsList.innerHTML = groups
+    .map(
+      (g) => `
+      <div class="sw-list-item ${currentView === 'group' && activeGroupId === g.id ? 'active' : ''}"
+           data-group-id="${g.id}"
+           onclick="switchView('group', '${g.id}')">
+        <div class="sw-list-item-left">
+          <span class="sw-item-icon">🏷️</span>
+          <span class="sw-item-name">${g.name}</span>
+        </div>
+      </div>
+    `
+    )
+    .join('');
 
-  let totalYouAreOwed = 0;
-  let totalYouOwe = 0;
+  // Friends List with Balance indicator
+  sidebarFriendsList.innerHTML = friends
+    .map((f) => {
+      const isSelected = currentView === 'friend' && activeFriendId === f.friend.id;
+      let balMarkup = '';
 
-  for (const f of friends) {
-    if (f.netBalance > 0.005) {
-      totalYouAreOwed += f.netBalance;
-    } else if (f.netBalance < -0.005) {
-      totalYouOwe += Math.abs(f.netBalance);
-    }
-  }
+      if (f.netBalance > 0.005) {
+        balMarkup = `<span class="sw-item-balance text-teal">+${formatCurrency(f.netBalance)}</span>`;
+      } else if (f.netBalance < -0.005) {
+        balMarkup = `<span class="sw-item-balance text-orange">-${formatCurrency(Math.abs(f.netBalance))}</span>`;
+      }
 
-  const directSpend = expenses.reduce((sum, e) => sum + (e.category === 'Payment' ? 0 : e.totalAmount), 0);
-  metricTotalSpend.innerText = formatCurrency(directSpend, currency);
-  metricExpenseCount.innerText = `${expenses.length} 1:1 transactions`;
-
-  metricDebtVolume.innerText = `+${formatCurrency(totalYouAreOwed, currency)}`;
-  metricUnsimplifiedCount.innerText = 'Total you are owed';
-
-  metricOptimization.innerText = `-${formatCurrency(totalYouOwe, currency)}`;
-  metricSimplifiedCount.innerText = 'Total you owe friends';
+      return `
+        <div class="sw-list-item ${isSelected ? 'active' : ''}"
+             data-friend-id="${f.friend.id}"
+             onclick="switchView('friend', '${f.friend.id}')">
+          <div class="sw-list-item-left">
+            <span class="sw-item-icon">${f.friend.avatarUrl || '👤'}</span>
+            <span class="sw-item-name">${f.friend.name}</span>
+          </div>
+          ${balMarkup}
+        </div>
+      `;
+    })
+    .join('');
 }
 
-function renderFriendCards() {
-  const currency = 'INR';
-  const currentUser = allUsers.find((u) => u.id === currentUserId);
-
-  if (friends.length === 0) {
-    debtsContainer.innerHTML = `
-      <div class="empty-state">
-        <div class="empty-icon">👥</div>
-        <h3>No friends added yet</h3>
-        <p>Click "+ Add Friend" to connect with participants.</p>
+// Render Center Expenses Feed
+function renderExpensesFeed() {
+  if (currentExpenses.length === 0) {
+    expensesFeed.innerHTML = `
+      <div class="sw-empty-state">
+        <div class="sw-empty-icon">📝</div>
+        <h3>No expenses here yet</h3>
+        <p>Click the orange "Add an expense" button above to log a new bill!</p>
       </div>
     `;
     return;
   }
 
-  debtsContainer.innerHTML = friends
-    .map((f) => {
-      const isSelected = activeFriend && activeFriend.friend.id === f.friend.id;
-      let statusText = 'Settled up';
-      let statusColor = 'color: var(--text-muted)';
-      let fromUser = '';
-      let toUser = '';
-      let settleAmt = 0;
+  expensesFeed.innerHTML = currentExpenses
+    .map((exp) => {
+      const { month, day } = parseMonthDay(exp.createdAt);
+      const icon = CATEGORY_ICONS[exp.category] || '🛒';
+      const isPayment = exp.category === 'Payment';
 
-      if (f.netBalance > 0.005) {
-        statusText = `${f.friend.name} owes you ${formatCurrency(f.netBalance, currency)}`;
-        statusColor = 'color: var(--success)';
-        fromUser = f.friend.id;
-        toUser = currentUserId;
-        settleAmt = f.netBalance;
-      } else if (f.netBalance < -0.005) {
-        statusText = `You owe ${f.friend.name} ${formatCurrency(Math.abs(f.netBalance), currency)}`;
-        statusColor = 'color: var(--danger)';
-        fromUser = currentUserId;
-        toUser = f.friend.id;
-        settleAmt = Math.abs(f.netBalance);
+      // Payer description string
+      const isYouPayer = exp.payers.some((p) => p.userId === currentUserId);
+      const payerNames = exp.payers
+        .map((p) => {
+          if (p.userId === currentUserId) return 'you';
+          const u = allUsers.find((user) => user.id === p.userId);
+          return u ? u.name : p.userId;
+        })
+        .join(', ');
+
+      // Split impact on current user
+      const userSplit = exp.splits.find((s) => s.userId === currentUserId);
+      const userPaidObj = exp.payers.find((p) => p.userId === currentUserId);
+      const userPaidAmt = userPaidObj ? userPaidObj.amount : 0;
+      const userOwedAmt = userSplit ? userSplit.amount : 0;
+      const netImpact = userPaidAmt - userOwedAmt;
+
+      let shareBadge = '';
+      if (isPayment) {
+        if (isYouPayer) {
+          shareBadge = `
+            <div class="sw-share-badge">
+              <span class="sw-share-label text-teal">you paid</span>
+              <span class="sw-share-amount text-teal">${formatCurrency(exp.totalAmount, exp.currency)}</span>
+            </div>
+          `;
+        } else {
+          shareBadge = `
+            <div class="sw-share-badge">
+              <span class="sw-share-label text-teal">you received</span>
+              <span class="sw-share-amount text-teal">${formatCurrency(exp.totalAmount, exp.currency)}</span>
+            </div>
+          `;
+        }
+      } else if (netImpact > 0.005) {
+        shareBadge = `
+          <div class="sw-share-badge">
+            <span class="sw-share-label text-teal">you lent</span>
+            <span class="sw-share-amount text-teal">${formatCurrency(netImpact, exp.currency)}</span>
+          </div>
+        `;
+      } else if (netImpact < -0.005) {
+        shareBadge = `
+          <div class="sw-share-badge">
+            <span class="sw-share-label text-orange">you borrowed</span>
+            <span class="sw-share-amount text-orange">${formatCurrency(Math.abs(netImpact), exp.currency)}</span>
+          </div>
+        `;
+      } else if (userPaidAmt > 0 && userOwedAmt === userPaidAmt) {
+        shareBadge = `
+          <div class="sw-share-badge">
+            <span class="sw-share-label" style="color:#888;">no balance</span>
+            <span class="sw-share-amount" style="color:#888;">₹0.00</span>
+          </div>
+        `;
+      } else {
+        shareBadge = `
+          <div class="sw-share-badge">
+            <span class="sw-share-label" style="color:#aaa;">not involved</span>
+          </div>
+        `;
       }
 
       return `
-        <div class="debt-transfer-card ${isSelected ? 'active-friend-card' : ''}" style="cursor:pointer;" onclick="selectFriend('${f.friend.id}')">
-          <div class="party from">
-            <div class="avatar">${f.friend.avatarUrl || '👤'}</div>
-            <div style="display:flex; flex-direction:column;">
-              <span class="party-name">${f.friend.name}</span>
-              <span style="font-size:0.75rem; font-weight:700; ${statusColor}">${statusText}</span>
+        <div class="sw-expense-item" id="exp-item-${exp.id}">
+          <div class="sw-expense-row" onclick="toggleExpenseDetails('${exp.id}')">
+            <div class="sw-expense-left">
+              <div class="sw-date-box">
+                <span class="sw-date-month">${month}</span>
+                <span class="sw-date-day">${day}</span>
+              </div>
+              <div class="sw-cat-icon">${icon}</div>
+              <div class="sw-exp-desc-wrap">
+                <span class="sw-exp-desc">${exp.description}</span>
+                <span class="sw-exp-payer">${payerNames} paid ${formatCurrency(exp.totalAmount, exp.currency)}</span>
+              </div>
+            </div>
+
+            <div class="sw-expense-right">
+              ${shareBadge}
+              <button class="sw-btn-delete-row" title="Delete expense" onclick="event.stopPropagation(); deleteExpense('${exp.id}')">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+              </button>
             </div>
           </div>
 
-          <div class="debt-arrow-bridge">
-            <span class="transfer-amount" style="font-size:0.95rem;">${formatCurrency(Math.abs(f.netBalance), currency)}</span>
-            <div class="arrow-line"></div>
-          </div>
+          <!-- Expanded Detail & Comments Section -->
+          <div class="sw-expense-detail-view hidden" id="exp-detail-${exp.id}">
+            <div class="sw-detail-breakdown">
+              <div class="sw-detail-item" style="margin-bottom:8px;">
+                <span>📅 <strong>${new Date(exp.createdAt).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</strong></span>
+              </div>
+              ${exp.splits
+                .map((s) => {
+                  const u = allUsers.find((user) => user.id === s.userId);
+                  const name = s.userId === currentUserId ? 'You' : u ? u.name : s.userId;
+                  return `
+                  <div class="sw-detail-item">
+                    <span>${u?.avatarUrl || '👤'}</span>
+                    <span>${name} owes <strong>${formatCurrency(s.amount, exp.currency)}</strong></span>
+                  </div>
+                `;
+                })
+                .join('')}
+            </div>
 
-          <div class="party to">
-            <div class="avatar">${currentUser?.avatarUrl || '👤'}</div>
-          </div>
-
-          <div class="debt-actions">
-            ${
-              settleAmt > 0
-                ? `<button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); openDirectSettle('${fromUser}', '${toUser}', ${settleAmt})">Settle</button>`
-                : `<span style="font-size:0.75rem; color:var(--text-sub);">✓ Settled</span>`
-            }
+            <!-- Comments Section -->
+            <div class="sw-comments-section">
+              <div class="sw-comments-title">COMMENTS</div>
+              <div class="sw-comments-list" id="comments-list-${exp.id}">
+                <span style="font-size:11px; color:#999;">Loading comments...</span>
+              </div>
+              <form class="sw-comment-form" onsubmit="handleCommentSubmit(event, '${exp.id}')">
+                <input type="text" id="comment-input-${exp.id}" class="sw-comment-input" placeholder="Write a comment..." required>
+                <button type="submit" class="sw-btn-comment-post">Post</button>
+              </form>
+            </div>
           </div>
         </div>
       `;
@@ -431,89 +730,120 @@ function renderFriendCards() {
     .join('');
 }
 
-window.selectFriend = async function (friendId) {
-  activeFriend = friends.find((f) => f.friend.id === friendId) || null;
-  if (friendSelect) friendSelect.value = friendId;
-  await refreshFriendData();
+// Toggle Expense Details Dropdown
+window.toggleExpenseDetails = async function (expenseId) {
+  const detailEl = document.getElementById(`exp-detail-${expenseId}`);
+  if (!detailEl) return;
+
+  const isHidden = detailEl.classList.contains('hidden');
+  if (isHidden) {
+    detailEl.classList.remove('hidden');
+    await loadExpenseComments(expenseId);
+  } else {
+    detailEl.classList.add('hidden');
+  }
 };
 
-function renderFriendNetBalances() {
-  const currency = 'INR';
-  netBalancesContainer.innerHTML = friends
-    .map((f) => {
-      let statusClass = 'zero';
-      let formattedVal = formatCurrency(0, currency);
+// Comments
+async function loadExpenseComments(expenseId) {
+  const container = document.getElementById(`comments-list-${expenseId}`);
+  if (!container) return;
 
-      if (f.netBalance > 0.005) {
-        statusClass = 'positive';
-        formattedVal = `+${formatCurrency(f.netBalance, currency)}`;
-      } else if (f.netBalance < -0.005) {
-        statusClass = 'negative';
-        formattedVal = `-${formatCurrency(Math.abs(f.netBalance), currency)}`;
-      }
+  try {
+    const res = await fetch(`/api/expenses/${expenseId}/comments`).then((r) => r.json());
+    const comments = res.data || [];
 
-      return `
-        <div class="balance-chip" style="cursor:pointer;" onclick="selectFriend('${f.friend.id}')">
-          <div class="user-info">
-            <span class="avatar" style="width:28px;height:28px;font-size:0.9rem;">${f.friend.avatarUrl || '👤'}</span>
-            <span style="font-weight:600;font-size:0.88rem;">${f.friend.name}</span>
+    if (comments.length === 0) {
+      container.innerHTML = `<span style="font-size:11px; color:#aaa;">No comments yet on this expense.</span>`;
+      return;
+    }
+
+    container.innerHTML = comments
+      .map(
+        (c) => `
+        <div class="sw-comment-card">
+          <div class="sw-comment-avatar">${c.userAvatar || '👤'}</div>
+          <div class="sw-comment-bubble">
+            <div class="sw-comment-meta">
+              <span class="sw-comment-author">${c.userName}</span>
+              <span>${new Date(c.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+            </div>
+            <div class="sw-comment-text">${c.content}</div>
           </div>
-          <span class="balance-val ${statusClass}">${formattedVal}</span>
         </div>
-      `;
-    })
-    .join('');
+      `
+      )
+      .join('');
+  } catch (err) {
+    container.innerHTML = `<span style="font-size:11px; color:#e53935;">Error loading comments.</span>`;
+  }
 }
 
-// Render Functions (Shared / Group)
-function renderDebts() {
-  if (activeTab === 'friends') {
-    renderFriendCards();
+window.handleCommentSubmit = async function (e, expenseId) {
+  e.preventDefault();
+  const input = document.getElementById(`comment-input-${expenseId}`);
+  if (!input || !input.value.trim()) return;
+
+  try {
+    const res = await fetch(`/api/expenses/${expenseId}/comments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: currentUserId, content: input.value.trim() }),
+    });
+
+    if (!res.ok) throw new Error('Failed to post comment');
+    input.value = '';
+    await loadExpenseComments(expenseId);
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+};
+
+// Render Simplification Feed
+function renderSimplificationFeed() {
+  if (!groupSettlement) {
+    simplificationFeed.innerHTML = `<div class="sw-empty-state"><p>No settlement data available.</p></div>`;
     return;
   }
 
-  if (!settlementData) return;
   const currency = activeGroup?.currency || 'INR';
-  const debtList = viewMode === 'simplified' ? settlementData.simplifiedDebts : settlementData.unsimplifiedDebts;
+  const stats = groupSettlement.stats;
+  statReductionPct.innerText = `${stats.reductionPercentage}%`;
+  statTransfersCount.innerText = `${simplificationMode === 'simplified' ? stats.simplifiedCount : stats.unsimplifiedCount}`;
+  statTotalVolume.innerText = formatCurrency(stats.totalVolume, currency);
 
-  if (debtList.length === 0) {
-    debtsContainer.innerHTML = `
-      <div class="empty-state">
-        <div class="empty-icon">🎉</div>
-        <h3>All balances are settled up!</h3>
-        <p>No outstanding debts exist for this group.</p>
+  const debts =
+    simplificationMode === 'simplified' ? groupSettlement.simplifiedDebts : groupSettlement.unsimplifiedDebts;
+
+  if (debts.length === 0) {
+    simplificationTransfersList.innerHTML = `
+      <div class="sw-empty-state">
+        <div class="sw-empty-icon">🎉</div>
+        <h3>All group debts are completely settled!</h3>
       </div>
     `;
     return;
   }
 
-  debtsContainer.innerHTML = debtList
-    .map((debt) => {
-      const fromUserObj = activeGroup.members.find((m) => m.id === debt.fromUser);
-      const toUserObj = activeGroup.members.find((m) => m.id === debt.toUser);
-
-      const fromAvatar = fromUserObj?.avatarUrl || '👤';
-      const toAvatar = toUserObj?.avatarUrl || '👤';
+  simplificationTransfersList.innerHTML = debts
+    .map((d) => {
+      const fromUserObj = allUsers.find((u) => u.id === d.fromUser);
+      const toUserObj = allUsers.find((u) => u.id === d.toUser);
+      const isFromMe = d.fromUser === currentUserId;
+      const isToMe = d.toUser === currentUserId;
 
       return `
-        <div class="debt-transfer-card">
-          <div class="party from">
-            <div class="avatar">${fromAvatar}</div>
-            <span class="party-name">${debt.fromUserName}</span>
+        <div class="sw-transfer-card">
+          <div class="sw-transfer-left">
+            <span style="font-size:20px;">${fromUserObj?.avatarUrl || '👤'}</span>
+            <span style="font-weight:700;">${isFromMe ? 'You' : d.fromUserName}</span>
+            <span class="sw-transfer-arrow">➔ pays ➔</span>
+            <span style="font-size:20px;">${toUserObj?.avatarUrl || '👤'}</span>
+            <span style="font-weight:700;">${isToMe ? 'You' : d.toUserName}</span>
           </div>
-
-          <div class="debt-arrow-bridge">
-            <span class="transfer-amount">${formatCurrency(debt.amount, currency)}</span>
-            <div class="arrow-line"></div>
-          </div>
-
-          <div class="party to">
-            <span class="party-name">${debt.toUserName}</span>
-            <div class="avatar">${toAvatar}</div>
-          </div>
-
-          <div class="debt-actions">
-            <button class="btn btn-sm btn-primary" onclick="openDirectSettle('${debt.fromUser}', '${debt.toUser}', ${debt.amount})">
+          <div style="display:flex; align-items:center; gap:12px;">
+            <span class="sw-transfer-amt">${formatCurrency(d.amount, currency)}</span>
+            <button class="sw-btn-transfer-settle" onclick="openSettleModal('${d.fromUser}', '${d.toUser}', ${d.amount})">
               Settle
             </button>
           </div>
@@ -523,252 +853,269 @@ function renderDebts() {
     .join('');
 }
 
-function renderNetBalances() {
-  if (activeTab === 'friends') {
-    renderFriendNetBalances();
-    return;
+// 5. Right Sidebar Renderers
+function renderDashboardRightSidebar(netTotal, totalYouOwe, totalYouAreOwed) {
+  const owesYouList = friends.filter((f) => f.netBalance > 0.005);
+  const youOweList = friends.filter((f) => f.netBalance < -0.005);
+
+  let netMarkup = '';
+  if (Math.abs(netTotal) < 0.005) {
+    netMarkup = `<span class="sw-right-big-balance" style="color:#888;">₹0.00</span>`;
+  } else if (netTotal > 0) {
+    netMarkup = `<span class="sw-right-big-balance text-teal">+${formatCurrency(netTotal)}</span>`;
+  } else {
+    netMarkup = `<span class="sw-right-big-balance text-orange">-${formatCurrency(Math.abs(netTotal))}</span>`;
   }
 
-  if (!settlementData) return;
-  const currency = activeGroup?.currency || 'INR';
-  const balances = settlementData.netBalances || [];
+  rightSidebarContent.innerHTML = `
+    <div>
+      <div class="sw-right-header">YOUR TOTAL BALANCE</div>
+      ${netMarkup}
+    </div>
 
-  netBalancesContainer.innerHTML = balances
-    .map((b) => {
-      const userObj = activeGroup.members.find((m) => m.id === b.userId);
-      const avatar = userObj?.avatarUrl || '👤';
-
-      let statusClass = 'zero';
-      let formattedVal = formatCurrency(0, currency);
-
-      if (b.balance > 0.005) {
-        statusClass = 'positive';
-        formattedVal = `+${formatCurrency(b.balance, currency)}`;
-      } else if (b.balance < -0.005) {
-        statusClass = 'negative';
-        formattedVal = `-${formatCurrency(Math.abs(b.balance), currency)}`;
-      }
-
-      return `
-        <div class="balance-chip">
-          <div class="user-info">
-            <span class="avatar" style="width:28px;height:28px;font-size:0.9rem;">${avatar}</span>
-            <span style="font-weight:600;font-size:0.88rem;">${b.userName}</span>
-          </div>
-          <span class="balance-val ${statusClass}">${formattedVal}</span>
-        </div>
-      `;
-    })
-    .join('');
-}
-
-function renderExpenses() {
-  const currency = activeGroup?.currency || 'INR';
-
-  if (expenses.length === 0) {
-    expensesTimeline.innerHTML = `
-      <div class="empty-state">
-        <div class="empty-icon">📝</div>
-        <h3>No expenses recorded yet</h3>
-        <p>Click "Add Expense" to log shared costs.</p>
-      </div>
-    `;
-    return;
-  }
-
-  expensesTimeline.innerHTML = expenses
-    .map((exp) => {
-      const isSettlement = exp.category === 'Payment';
-      const icon = categoryIcons[exp.category || 'General'] || '🛒';
-      const payerNames = exp.payers
-        .map((p) => {
-          const u = allUsers.find((m) => m.id === p.userId);
-          return u ? u.name : p.userId;
-        })
-        .join(', ');
-
-      const formattedDate = new Date(exp.createdAt).toLocaleDateString(undefined, {
-        month: 'short',
-        day: 'numeric',
-      });
-
-      return `
-        <div class="expense-item-wrapper" id="exp-wrapper-${exp.id}">
-          <div class="expense-row ${isSettlement ? 'settlement-row' : ''}" style="border:none; border-radius:0;">
-            <div class="exp-main">
-              <div class="cat-badge">${icon}</div>
-              <div class="exp-info">
-                <span class="exp-title">${exp.description}</span>
-                <span class="exp-sub">Paid by <strong>${payerNames}</strong> • ${formattedDate}</span>
+    ${
+      youOweList.length > 0
+        ? `
+      <div>
+        <div class="sw-right-header text-orange">YOU OWE</div>
+        <div class="sw-balance-user-list">
+          ${youOweList
+            .map(
+              (f) => `
+            <div class="sw-balance-user-row" style="cursor:pointer;" onclick="switchView('friend', '${f.friend.id}')">
+              <div class="sw-balance-user-info">
+                <span>${f.friend.avatarUrl || '👤'}</span>
+                <span class="sw-balance-user-name">${f.friend.name}</span>
               </div>
+              <span class="sw-balance-user-val text-orange">you owe ${formatCurrency(Math.abs(f.netBalance))}</span>
             </div>
-            <div class="exp-right">
-              <span class="exp-amount">${formatCurrency(exp.totalAmount, currency)}</span>
-              <button class="btn-comments-toggle" onclick="toggleComments('${exp.id}')" title="Comments thread">
-                💬 <span id="comment-count-${exp.id}">Comments</span>
-              </button>
-              <button class="btn-del" title="Delete expense" onclick="deleteExpense('${exp.id}')">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polyline points="3 6 5 6 21 6"></polyline>
-                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                </svg>
-              </button>
-            </div>
-          </div>
-
-          <!-- Inline Comments Thread (Hidden by default) -->
-          <div id="comments-box-${exp.id}" class="comments-container hidden">
-            <div id="comments-list-${exp.id}" class="comments-list">
-              <span style="font-size:0.78rem; color:var(--text-sub);">Loading comments...</span>
-            </div>
-            <form class="comment-form" onsubmit="handleCommentSubmit(event, '${exp.id}')">
-              <input type="text" id="comment-input-${exp.id}" class="comment-input" placeholder="Write a comment or note..." required>
-              <button type="submit" class="btn-comment-send">Post</button>
-            </form>
-          </div>
+          `
+            )
+            .join('')}
         </div>
-      `;
-    })
-    .join('');
+      </div>
+    `
+        : ''
+    }
+
+    ${
+      owesYouList.length > 0
+        ? `
+      <div>
+        <div class="sw-right-header text-teal">YOU ARE OWED</div>
+        <div class="sw-balance-user-list">
+          ${owesYouList
+            .map(
+              (f) => `
+            <div class="sw-balance-user-row" style="cursor:pointer;" onclick="switchView('friend', '${f.friend.id}')">
+              <div class="sw-balance-user-info">
+                <span>${f.friend.avatarUrl || '👤'}</span>
+                <span class="sw-balance-user-name">${f.friend.name}</span>
+              </div>
+              <span class="sw-balance-user-val text-teal">owes you ${formatCurrency(f.netBalance)}</span>
+            </div>
+          `
+            )
+            .join('')}
+        </div>
+      </div>
+    `
+        : ''
+    }
+
+    ${
+      owesYouList.length === 0 && youOweList.length === 0
+        ? `
+      <div style="font-size:12px; color:#888;">
+        You do not owe anything and no one owes you! 🎉
+      </div>
+    `
+        : ''
+    }
+  `;
 }
 
-// Comments Functions
-window.toggleComments = async function (expenseId) {
-  const box = document.getElementById(`comments-box-${expenseId}`);
-  if (!box) return;
+function renderGroupRightSidebar() {
+  if (!activeGroup || !groupSettlement) return;
+  const currency = activeGroup.currency || 'INR';
 
-  const isHidden = box.classList.contains('hidden');
-  if (isHidden) {
-    box.classList.remove('hidden');
-    await loadComments(expenseId);
+  rightSidebarContent.innerHTML = `
+    <div>
+      <div class="sw-right-header">GROUP BALANCES</div>
+      <div class="sw-balance-user-list">
+        ${groupSettlement.netBalances
+          .map((b) => {
+            const user = allUsers.find((u) => u.id === b.userId);
+            const isMe = b.userId === currentUserId;
+            let valClass = 'color:#888';
+            let valText = 'settled';
+
+            if (b.balance > 0.005) {
+              valClass = 'color:var(--sw-teal)';
+              valText = `gets back ${formatCurrency(b.balance, currency)}`;
+            } else if (b.balance < -0.005) {
+              valClass = 'color:var(--sw-orange)';
+              valText = `owes ${formatCurrency(Math.abs(b.balance), currency)}`;
+            }
+
+            return `
+            <div class="sw-balance-user-row">
+              <div class="sw-balance-user-info">
+                <span>${user?.avatarUrl || '👤'}</span>
+                <span class="sw-balance-user-name">${isMe ? 'You' : b.userName}</span>
+              </div>
+              <span class="sw-balance-user-val" style="${valClass}; font-weight:700;">${valText}</span>
+            </div>
+          `;
+          })
+          .join('')}
+      </div>
+    </div>
+
+    <div>
+      <div class="sw-right-header">MIN-CASH-FLOW TRANSFERS</div>
+      <div style="font-size:12px; color:#666; margin-bottom:8px;">
+        Optimized by greedy bipartite matching:
+      </div>
+      <div class="sw-balance-user-list">
+        ${groupSettlement.simplifiedDebts
+          .map(
+            (d) => `
+          <div class="sw-balance-user-row" style="padding:6px 0;">
+            <div style="display:flex; flex-direction:column;">
+              <span style="font-weight:700; font-size:12px;">${d.fromUserName} pays ${d.toUserName}</span>
+              <span style="font-size:11px; color:var(--sw-teal); font-weight:800;">${formatCurrency(d.amount, currency)}</span>
+            </div>
+            <button class="sw-btn-transfer-settle" onclick="openSettleModal('${d.fromUser}', '${d.toUser}', ${d.amount})">
+              Settle
+            </button>
+          </div>
+        `
+          )
+          .join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderFriendRightSidebar() {
+  if (!activeFriend) return;
+
+  const bal = activeFriend.netBalance || 0;
+  let statusMarkup = '';
+
+  if (Math.abs(bal) < 0.005) {
+    statusMarkup = `<div style="font-size:13px; color:#666;">You and ${activeFriend.friend.name} are completely settled up!</div>`;
+  } else if (bal > 0) {
+    statusMarkup = `
+      <div class="sw-right-header text-teal">${activeFriend.friend.name.toUpperCase()} OWES YOU</div>
+      <div class="sw-right-big-balance text-teal">+${formatCurrency(bal)}</div>
+      <button class="sw-btn-primary-teal" style="width:100%; margin-top:8px;" onclick="openSettleModal('${activeFriend.friend.id}', '${currentUserId}', ${bal})">
+        Settle up
+      </button>
+    `;
   } else {
-    box.classList.add('hidden');
+    statusMarkup = `
+      <div class="sw-right-header text-orange">YOU OWE ${activeFriend.friend.name.toUpperCase()}</div>
+      <div class="sw-right-big-balance text-orange">-${formatCurrency(Math.abs(bal))}</div>
+      <button class="sw-btn-primary-orange" style="width:100%; margin-top:8px;" onclick="openSettleModal('${currentUserId}', '${activeFriend.friend.id}', ${Math.abs(bal)})">
+        Settle up
+      </button>
+    `;
   }
-};
 
-async function loadComments(expenseId) {
-  const list = document.getElementById(`comments-list-${expenseId}`);
-  const countSpan = document.getElementById(`comment-count-${expenseId}`);
-  if (!list) return;
-
-  try {
-    const res = await fetch(`/api/expenses/${expenseId}/comments`).then((r) => r.json());
-    const comments = res.data || [];
-
-    if (countSpan) {
-      countSpan.innerText = comments.length > 0 ? `${comments.length}` : 'Comments';
-    }
-
-    if (comments.length === 0) {
-      list.innerHTML = `<span style="font-size:0.78rem; color:var(--text-sub);">No comments yet. Start the conversation!</span>`;
-      return;
-    }
-
-    list.innerHTML = comments
-      .map(
-        (c) => `
-        <div class="comment-bubble">
-          <div class="comment-avatar">${c.userAvatar || '👤'}</div>
-          <div class="comment-body">
-            <div class="comment-header">
-              <span class="comment-author">${c.userName}</span>
-              <span class="comment-date">${new Date(c.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-            </div>
-            <div class="comment-text">${c.content}</div>
-          </div>
-        </div>
-      `
-      )
-      .join('');
-  } catch (err) {
-    list.innerHTML = `<span style="font-size:0.78rem; color:var(--danger);">Error loading comments</span>`;
-  }
+  rightSidebarContent.innerHTML = `
+    <div>
+      <div class="sw-right-header">1-ON-1 BALANCE</div>
+      ${statusMarkup}
+    </div>
+  `;
 }
 
-window.handleCommentSubmit = async function (e, expenseId) {
-  e.preventDefault();
-  const input = document.getElementById(`comment-input-${expenseId}`);
-  if (!input || !input.value.trim()) return;
+// 6. Modals
+function openExpenseModal() {
+  const contextSelect = document.getElementById('modalExpContext');
 
-  const content = input.value.trim();
-  try {
-    const res = await fetch(`/api/expenses/${expenseId}/comments`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: currentUserId, content }),
-    });
+  // Populate groups and friends
+  let options = '';
+  options += `<optgroup label="Groups">`;
+  options += groups.map((g) => `<option value="group:${g.id}">🌴 ${g.name}</option>`).join('');
+  options += `</optgroup>`;
 
-    if (!res.ok) throw new Error('Failed to post comment');
-    input.value = '';
-    await loadComments(expenseId);
-  } catch (err) {
-    alert('Error posting comment: ' + err.message);
+  options += `<optgroup label="1-on-1 Friends">`;
+  options += friends.map((f) => `<option value="friend:${f.friend.id}">👤 ${f.friend.name}</option>`).join('');
+  options += `</optgroup>`;
+
+  contextSelect.innerHTML = options;
+
+  if (currentView === 'group' && activeGroupId) {
+    contextSelect.value = `group:${activeGroupId}`;
+  } else if (currentView === 'friend' && activeFriendId) {
+    contextSelect.value = `friend:${activeFriendId}`;
   }
-};
 
-// Modal Openers
-function openExpenseModal(defaultScope = 'group') {
-  const scopeSelect = document.getElementById('expScope');
-  if (scopeSelect) scopeSelect.value = defaultScope;
+  // Set date to today
+  document.getElementById('expDate').value = new Date().toISOString().split('T')[0];
 
-  updateExpenseModalParticipants(defaultScope);
-  modalExpense.classList.remove('hidden');
+  updateExpenseModalParticipants();
+  modalAddExpense.classList.remove('hidden');
 }
 
-function updateExpenseModalParticipants(scope) {
+function updateExpenseModalParticipants() {
+  const contextVal = document.getElementById('modalExpContext').value;
+  const [type, id] = contextVal.split(':');
   const payerSelect = document.getElementById('expPayer');
-  let eligibleUsers = [];
 
-  if (scope === 'friend' && activeFriend) {
-    const currentUser = allUsers.find((u) => u.id === currentUserId);
-    eligibleUsers = [currentUser, activeFriend.friend].filter(Boolean);
-  } else if (activeGroup) {
-    eligibleUsers = activeGroup.members;
+  let participants = [];
+  if (type === 'group') {
+    const grp = groups.find((g) => g.id === id);
+    participants = grp ? grp.members : allUsers;
   } else {
-    eligibleUsers = allUsers;
+    const fr = friends.find((f) => f.friend.id === id);
+    const me = allUsers.find((u) => u.id === currentUserId);
+    participants = [me, fr?.friend].filter(Boolean);
   }
 
-  payerSelect.innerHTML = eligibleUsers.map((m) => `<option value="${m.id}">${m.name}</option>`).join('');
-  if (currentUserId && eligibleUsers.some((u) => u.id === currentUserId)) {
-    payerSelect.value = currentUserId;
-  }
+  payerSelect.innerHTML = participants.map((p) => `<option value="${p.id}">${p.id === currentUserId ? 'You' : p.name}</option>`).join('');
+  payerSelect.value = currentUserId;
 
-  const activeSplitType = document.querySelector('input[name="splitType"]:checked')?.value || 'EQUAL';
-  renderParticipantsSplitInputs(activeSplitType, eligibleUsers);
+  const splitType = document.getElementById('activeSplitType').value || 'EQUAL';
+  renderParticipantSplitRows(splitType, participants);
 }
 
-function renderParticipantsSplitInputs(splitType, userList = null) {
-  const container = document.getElementById('participantsSplitList');
-  const scope = document.getElementById('expScope')?.value || 'group';
+function renderParticipantSplitRows(splitType, userList = null) {
+  const container = document.getElementById('participantsSplitBox');
+  let participants = userList;
 
-  let eligibleUsers = userList;
-  if (!eligibleUsers) {
-    if (scope === 'friend' && activeFriend) {
-      const currentUser = allUsers.find((u) => u.id === currentUserId);
-      eligibleUsers = [currentUser, activeFriend.friend].filter(Boolean);
-    } else if (activeGroup) {
-      eligibleUsers = activeGroup.members;
+  if (!participants) {
+    const contextVal = document.getElementById('modalExpContext').value;
+    const [type, id] = contextVal.split(':');
+    if (type === 'group') {
+      const grp = groups.find((g) => g.id === id);
+      participants = grp ? grp.members : allUsers;
     } else {
-      eligibleUsers = allUsers;
+      const fr = friends.find((f) => f.friend.id === id);
+      const me = allUsers.find((u) => u.id === currentUserId);
+      participants = [me, fr?.friend].filter(Boolean);
     }
   }
 
-  container.innerHTML = eligibleUsers
-    .map((m) => {
+  container.innerHTML = participants
+    .map((p) => {
       let customInput = '';
       if (splitType === 'EXACT') {
-        customInput = `<input type="number" step="0.01" class="split-val-input" data-user-id="${m.id}" placeholder="₹ 0.00" required>`;
+        customInput = `<input type="number" step="0.01" class="sw-split-val-input" data-user-id="${p.id}" placeholder="₹0.00" required>`;
       } else if (splitType === 'PERCENT') {
-        customInput = `<input type="number" step="0.1" class="split-val-input" data-user-id="${m.id}" placeholder="% 0" required>`;
+        customInput = `<input type="number" step="0.1" class="sw-split-val-input" data-user-id="${p.id}" placeholder="%0" required>`;
       } else if (splitType === 'SHARES') {
-        customInput = `<input type="number" step="1" min="1" value="1" class="split-val-input" data-user-id="${m.id}" required>`;
+        customInput = `<input type="number" step="1" min="1" value="1" class="sw-split-val-input" data-user-id="${p.id}" required>`;
       }
 
       return `
-        <div class="participant-item">
-          <label>
-            <input type="checkbox" class="participant-checkbox" value="${m.id}" checked>
-            <span>${m.avatarUrl || '👤'} ${m.name}</span>
+        <div class="sw-split-user-row">
+          <label style="display:flex; align-items:center; gap:8px;">
+            <input type="checkbox" class="sw-modal-user-cb" value="${p.id}" checked>
+            <span>${p.avatarUrl || '👤'} ${p.id === currentUserId ? 'You' : p.name}</span>
           </label>
           ${customInput}
         </div>
@@ -777,84 +1124,86 @@ function renderParticipantsSplitInputs(splitType, userList = null) {
     .join('');
 }
 
-function openSettleModal(fromId = '', toId = '', amount = '') {
+function openSettleModal(fromId = null, toId = null, amount = null) {
   const payerSelect = document.getElementById('settlePayer');
   const receiverSelect = document.getElementById('settleReceiver');
   const amountInput = document.getElementById('settleAmount');
+  const dateInput = document.getElementById('settleDate');
 
-  let memberList = activeGroup?.members || allUsers;
-  const options = memberList.map((m) => `<option value="${m.id}">${m.name}</option>`).join('');
+  let memberList = currentView === 'group' && activeGroup ? activeGroup.members : allUsers;
+  const options = memberList.map((m) => `<option value="${m.id}">${m.id === currentUserId ? 'You' : m.name}</option>`).join('');
+
   payerSelect.innerHTML = options;
   receiverSelect.innerHTML = options;
 
   if (fromId) payerSelect.value = fromId;
-  if (toId) receiverSelect.value = toId;
-  if (amount) amountInput.value = amount;
+  else payerSelect.value = currentUserId;
 
-  modalSettle.classList.remove('hidden');
+  if (toId) receiverSelect.value = toId;
+  else if (memberList.length > 1) {
+    receiverSelect.value = memberList.find((m) => m.id !== payerSelect.value)?.id || memberList[0].id;
+  }
+
+  if (amount) amountInput.value = amount;
+  else amountInput.value = '';
+
+  dateInput.value = new Date().toISOString().split('T')[0];
+
+  modalSettleUp.classList.remove('hidden');
 }
 
-window.openDirectSettle = function (fromId, toId, amount) {
-  openSettleModal(fromId, toId, amount);
-};
-
 function openGroupModal() {
-  const membersList = document.getElementById('groupMembersList');
-  membersList.innerHTML = allUsers
+  const container = document.getElementById('groupMembersChecklist');
+  container.innerHTML = allUsers
     .map(
       (u) => `
-      <div class="participant-item">
-        <label>
-          <input type="checkbox" class="group-user-cb" value="${u.id}" checked>
-          <span>${u.avatarUrl || '👤'} ${u.name} (${u.email || 'No email'})</span>
-        </label>
-      </div>
+      <label style="display:flex; align-items:center; gap:8px; padding:4px 0; font-size:13px;">
+        <input type="checkbox" class="sw-group-member-cb" value="${u.id}" checked>
+        <span>${u.avatarUrl || '👤'} ${u.name}</span>
+      </label>
     `
     )
     .join('');
 
-  modalGroup.classList.remove('hidden');
+  modalCreateGroup.classList.remove('hidden');
 }
 
 function openFriendModal() {
   const select = document.getElementById('newFriendSelect');
-  const currentFriendIds = new Set(friends.map((f) => f.friend.id));
-  currentFriendIds.add(currentUserId);
+  const friendIdSet = new Set(friends.map((f) => f.friend.id));
+  friendIdSet.add(currentUserId);
 
-  const nonFriends = allUsers.filter((u) => !currentFriendIds.has(u.id));
-
+  const nonFriends = allUsers.filter((u) => !friendIdSet.has(u.id));
   if (nonFriends.length === 0) {
-    select.innerHTML = '<option disabled>All available users are already friends!</option>';
+    select.innerHTML = '<option disabled>All available users are already connected!</option>';
   } else {
-    select.innerHTML = nonFriends
-      .map((u) => `<option value="${u.id}">${u.avatarUrl || '👤'} ${u.name} (${u.email || 'No email'})</option>`)
-      .join('');
+    select.innerHTML = nonFriends.map((u) => `<option value="${u.id}">${u.avatarUrl || '👤'} ${u.name}</option>`).join('');
   }
 
-  modalFriend.classList.remove('hidden');
+  modalAddFriend.classList.remove('hidden');
 }
 
-// Form Handlers
+// 7. Form Handlers
 async function handleExpenseSubmit(e) {
   e.preventDefault();
-  const desc = document.getElementById('expDesc').value;
+  const contextVal = document.getElementById('modalExpContext').value;
+  const [contextType, contextId] = contextVal.split(':');
+  const desc = document.getElementById('expDesc').value.trim();
   const amount = parseFloat(document.getElementById('expAmount').value);
   const category = document.getElementById('expCategory').value;
-  const scope = document.getElementById('expScope').value;
   const payerId = document.getElementById('expPayer').value;
-  const splitType = document.querySelector('input[name="splitType"]:checked').value;
+  const splitType = document.getElementById('activeSplitType').value || 'EQUAL';
 
-  const checkedBoxes = Array.from(document.querySelectorAll('.participant-checkbox:checked')).map((cb) => cb.value);
-
-  if (checkedBoxes.length === 0) {
-    alert('Please select at least one participant.');
+  const checkedUsers = Array.from(document.querySelectorAll('.sw-modal-user-cb:checked')).map((cb) => cb.value);
+  if (checkedUsers.length === 0) {
+    alert('Please select at least one person to split the expense with.');
     return;
   }
 
   let splits = [];
   if (splitType !== 'EQUAL') {
-    splits = checkedBoxes.map((uid) => {
-      const input = document.querySelector(`.split-val-input[data-user-id="${uid}"]`);
+    splits = checkedUsers.map((uid) => {
+      const input = document.querySelector(`.sw-split-val-input[data-user-id="${uid}"]`);
       const val = parseFloat(input?.value || '0');
       if (splitType === 'EXACT') return { userId: uid, amount: val };
       if (splitType === 'PERCENT') return { userId: uid, percentage: val, amount: (amount * val) / 100 };
@@ -863,31 +1212,37 @@ async function handleExpenseSubmit(e) {
     });
   }
 
-  const endpoint = scope === 'group' && activeGroup ? `/api/groups/${activeGroup.id}/expenses` : '/api/expenses';
+  const endpoint = contextType === 'group' ? `/api/groups/${contextId}/expenses` : '/api/expenses';
 
   try {
     const res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        groupId: scope === 'group' && activeGroup ? activeGroup.id : '0',
+        groupId: contextType === 'group' ? contextId : '0',
         description: desc,
         totalAmount: amount,
-        currency: activeGroup?.currency || 'INR',
+        currency: 'INR',
         category,
         splitType,
         payers: [{ userId: payerId, amount }],
         splits: splitType === 'EQUAL' ? undefined : splits,
-        participants: splitType === 'EQUAL' ? checkedBoxes : undefined,
+        participants: splitType === 'EQUAL' ? checkedUsers : undefined,
       }),
     });
 
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to add expense');
 
-    modalExpense.classList.add('hidden');
-    formExpense.reset();
-    await refreshActiveView();
+    modalAddExpense.classList.add('hidden');
+    formAddExpense.reset();
+    document.getElementById('splitTabsWrap').classList.add('hidden');
+
+    if (contextType === 'group') {
+      await switchView('group', contextId);
+    } else {
+      await switchView('friend', contextId);
+    }
   } catch (err) {
     alert('Error: ' + err.message);
   }
@@ -895,35 +1250,35 @@ async function handleExpenseSubmit(e) {
 
 async function handleSettleSubmit(e) {
   e.preventDefault();
-  const fromUserId = document.getElementById('settlePayer').value;
-  const toUserId = document.getElementById('settleReceiver').value;
+  const payerId = document.getElementById('settlePayer').value;
+  const receiverId = document.getElementById('settleReceiver').value;
   const amount = parseFloat(document.getElementById('settleAmount').value);
 
-  if (fromUserId === toUserId) {
+  if (payerId === receiverId) {
     alert('Payer and receiver cannot be the same user.');
     return;
   }
 
-  const groupId = activeTab === 'groups' && activeGroup ? activeGroup.id : '0';
+  const groupId = currentView === 'group' && activeGroup ? activeGroup.id : '0';
 
   try {
     const res = await fetch(`/api/groups/${groupId}/settle`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        fromUserId,
-        toUserId,
+        fromUserId: payerId,
+        toUserId: receiverId,
         amount,
-        currency: activeGroup?.currency || 'INR',
+        currency: 'INR',
       }),
     });
 
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed to settle debt');
+    if (!res.ok) throw new Error(data.error || 'Failed to record payment');
 
-    modalSettle.classList.add('hidden');
-    formSettle.reset();
-    await refreshActiveView();
+    modalSettleUp.classList.add('hidden');
+    formSettleUp.reset();
+    await reloadCurrentView();
   } catch (err) {
     alert('Error: ' + err.message);
   }
@@ -931,27 +1286,28 @@ async function handleSettleSubmit(e) {
 
 async function handleGroupSubmit(e) {
   e.preventDefault();
-  const name = document.getElementById('groupName').value;
-  const description = document.getElementById('groupDesc').value;
+  const name = document.getElementById('groupName').value.trim();
+  const desc = document.getElementById('groupDesc').value;
   const currency = document.getElementById('groupCurrency').value;
-  const memberIds = Array.from(document.querySelectorAll('.group-user-cb:checked')).map((cb) => cb.value);
+  const memberIds = Array.from(document.querySelectorAll('.sw-group-member-cb:checked')).map((cb) => cb.value);
 
   try {
     const res = await fetch('/api/groups', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, description, currency, memberIds }),
+      body: JSON.stringify({ name, description: desc, currency, memberIds }),
     });
 
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to create group');
 
-    modalGroup.classList.add('hidden');
-    formGroup.reset();
-    await loadInitialData();
-    groupSelect.value = data.data.id;
-    activeGroup = data.data;
-    await refreshGroupData();
+    modalCreateGroup.classList.add('hidden');
+    formCreateGroup.reset();
+
+    // Reload groups and navigate to new group
+    const groupsRes = await fetch('/api/groups').then((r) => r.json());
+    groups = groupsRes.data || [];
+    await switchView('group', data.data.id);
   } catch (err) {
     alert('Error: ' + err.message);
   }
@@ -969,23 +1325,24 @@ async function handleFriendSubmit(e) {
     });
 
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed to connect friendship');
+    if (!res.ok) throw new Error(data.error || 'Failed to connect friend');
 
-    modalFriend.classList.add('hidden');
-    formFriend.reset();
-    await refreshActiveView();
+    modalAddFriend.classList.add('hidden');
+    formAddFriend.reset();
+    await reloadFriends();
+    await switchView('friend', friendId);
   } catch (err) {
     alert('Error: ' + err.message);
   }
 }
 
 window.deleteExpense = async function (id) {
-  if (!confirm('Are you sure you want to delete this expense?')) return;
+  if (!confirm('Are you sure you want to delete this expense? This cannot be undone.')) return;
   try {
     const res = await fetch(`/api/expenses/${id}`, { method: 'DELETE' });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed to delete');
-    await refreshActiveView();
+    if (!res.ok) throw new Error(data.error || 'Failed to delete expense');
+    await reloadCurrentView();
   } catch (err) {
     alert('Error: ' + err.message);
   }
