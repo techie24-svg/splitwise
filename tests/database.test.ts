@@ -87,4 +87,35 @@ for (const [userId, bal] of summaryAfterSettlement.netBalances.entries()) {
 assert.strictEqual(summaryAfterSettlement.simplifiedDebts.length, 0, 'No remaining simplified debts');
 console.log('✓ Test 5: Settle up transaction resolves all balances to $0.00.');
 
+// 6. Friendships & 1-on-1 Direct Expenses
+testDb.addFriend(u1.id, u2.id);
+const aliceFriends = testDb.getFriends(u1.id);
+assert.strictEqual(aliceFriends.length, 1, 'Alice should have 1 friend (Bob)');
+assert.strictEqual(aliceFriends[0].id, u2.id);
+
+// Add 1-on-1 direct expense between Alice and Bob (outside group)
+const directExp = testDb.createExpense({
+  description: 'Coffee',
+  totalAmount: 10,
+  currency: 'USD',
+  splitType: 'EQUAL',
+  payers: [{ userId: u1.id, amount: 10 }],
+  splits: calculateEqualSplit(10, [u1.id, u2.id]),
+});
+assert.strictEqual(directExp.groupId, undefined, 'Direct expense should have no group');
+
+// Bob owes Alice $10 from group expenses + $5 from coffee = $15 total
+const friendBal = testDb.getFriendBalance(u1.id, u2.id);
+assert.strictEqual(friendBal, 15, 'Bob should owe Alice $15 total ($10 mutual + $5 coffee)');
+console.log('✓ Test 6: 1-on-1 Friendship and direct non-group expense balance passed.');
+
+// 7. Comments
+const comment = testDb.addComment(directExp.id, u2.id, 'Thanks for the coffee Alice!');
+assert.strictEqual(comment.content, 'Thanks for the coffee Alice!');
+
+const comments = testDb.getComments(directExp.id);
+assert.strictEqual(comments.length, 1);
+assert.strictEqual(comments[0].userName, 'Bob');
+console.log('✓ Test 7: Expense comments thread persistence passed.');
+
 console.log('\nAll Database Tests Passed Successfully! 🚀');

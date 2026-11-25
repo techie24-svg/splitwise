@@ -133,9 +133,10 @@ app.get('/api/groups/:id/expenses', (req, res) => {
   }
 });
 
-app.post('/api/groups/:id/expenses', (req, res) => {
+// Helper to process expense creation
+function handleCreateExpense(req: any, res: any, forcedGroupId?: string) {
   try {
-    const groupId = req.params.id;
+    const groupId = forcedGroupId !== undefined ? forcedGroupId : (req.body.groupId === '0' ? undefined : req.body.groupId);
     const {
       description,
       totalAmount,
@@ -157,7 +158,6 @@ app.post('/api/groups/:id/expenses', (req, res) => {
 
     let calculatedSplits = splits;
 
-    // Automatically calculate splits if participants array is passed for EQUAL
     if (!calculatedSplits || calculatedSplits.length === 0) {
       if (splitType === 'EQUAL' && Array.isArray(participants) && participants.length > 0) {
         calculatedSplits = calculateEqualSplit(Number(totalAmount), participants);
@@ -166,8 +166,13 @@ app.post('/api/groups/:id/expenses', (req, res) => {
       }
     }
 
+    // If this is a direct 1-on-1 expense, auto-register friendship
+    if (!groupId && participants && participants.length >= 2) {
+      db.addFriend(participants[0], participants[1]);
+    }
+
     const expense = db.createExpense({
-      groupId,
+      groupId: groupId || undefined,
       description,
       totalAmount: Number(totalAmount),
       currency: currency || 'INR',
@@ -181,6 +186,14 @@ app.post('/api/groups/:id/expenses', (req, res) => {
   } catch (err: any) {
     res.status(400).json({ success: false, error: err.message });
   }
+}
+
+app.post('/api/groups/:id/expenses', (req, res) => {
+  handleCreateExpense(req, res, req.params.id);
+});
+
+app.post('/api/expenses', (req, res) => {
+  handleCreateExpense(req, res);
 });
 
 app.delete('/api/expenses/:id', (req, res) => {
@@ -272,6 +285,95 @@ app.post('/api/groups/:id/settle', (req, res) => {
 
     const expense = db.recordSettlement(groupId, fromUserId, toUserId, Number(amount), currency);
     res.status(201).json({ success: true, data: expense });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ==========================================
+// 1-on-1 Friends Routes
+// ==========================================
+app.get('/api/friends', (req, res) => {
+  try {
+    const currentUserId = (req.query.userId as string) || db.getUsers()[0]?.id;
+    if (!currentUserId) {
+      return res.json({ success: true, data: [] });
+    }
+    const friendSummaries = db.getFriendSummaries(currentUserId);
+    res.json({ success: true, data: friendSummaries });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/friends', (req, res) => {
+  try {
+    const { userId1, userId2 } = req.body;
+    if (!userId1 || !userId2) {
+      return res.status(400).json({ success: false, error: 'Both userId1 and userId2 are required' });
+    }
+    db.addFriend(userId1, userId2);
+    res.status(201).json({ success: true, message: 'Friendship created' });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get('/api/friends/:id/expenses', (req, res) => {
+  try {
+    const friendId = req.params.id;
+    const currentUserId = (req.query.userId as string) || db.getUsers()[0]?.id;
+    const directExpenses = db.getDirectExpenses(currentUserId, friendId);
+    res.json({ success: true, data: directExpenses });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get('/api/friends/:id/balance', (req, res) => {
+  try {
+    const friendId = req.params.id;
+    const currentUserId = (req.query.userId as string) || db.getUsers()[0]?.id;
+    const balance = db.getFriendBalance(currentUserId, friendId);
+    res.json({ success: true, data: { userId: currentUserId, friendId, netBalance: balance } });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ==========================================
+// Expense Comments Routes
+// ==========================================
+app.get('/api/expenses/:id/comments', (req, res) => {
+  try {
+    const comments = db.getComments(req.params.id);
+    res.json({ success: true, data: comments });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/expenses/:id/comments', (req, res) => {
+  try {
+    const expenseId = req.params.id;
+    const { userId, content } = req.body;
+    if (!userId || !content || !content.trim()) {
+      return res.status(400).json({ success: false, error: 'userId and non-empty content are required' });
+    }
+    const comment = db.addComment(expenseId, userId, content.trim());
+    res.status(201).json({ success: true, data: comment });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.delete('/api/comments/:id', (req, res) => {
+  try {
+    const ok = db.deleteComment(req.params.id);
+    if (!ok) {
+      return res.status(404).json({ success: false, error: 'Comment not found' });
+    }
+    res.json({ success: true, message: 'Comment deleted successfully' });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }

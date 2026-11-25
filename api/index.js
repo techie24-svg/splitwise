@@ -67,6 +67,21 @@ var SplitwiseDB = class {
         percentage REAL,
         shares REAL
       );
+
+      CREATE TABLE IF NOT EXISTS friendships (
+        user_id1 TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        user_id2 TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        PRIMARY KEY (user_id1, user_id2)
+      );
+
+      CREATE TABLE IF NOT EXISTS comments (
+        id TEXT PRIMARY KEY,
+        expense_id TEXT NOT NULL REFERENCES expenses(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        content TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
     `);
   }
   // --- Users ---
@@ -250,8 +265,119 @@ var SplitwiseDB = class {
       }))
     };
   }
+  // --- Friendships & 1-on-1 Expenses ---
+  addFriend(userId1, userId2) {
+    if (userId1 === userId2) return;
+    const [u1, u2] = [userId1, userId2].sort();
+    this.db.prepare("INSERT OR IGNORE INTO friendships (user_id1, user_id2) VALUES (?, ?)").run(u1, u2);
+  }
+  getFriends(userId) {
+    const rows = this.db.prepare(`
+      SELECT u.id, u.name, u.email, u.avatar_url
+      FROM users u
+      WHERE u.id IN (
+        SELECT user_id2 FROM friendships WHERE user_id1 = ?
+        UNION
+        SELECT user_id1 FROM friendships WHERE user_id2 = ?
+      )
+      ORDER BY u.name ASC
+    `).all(userId, userId);
+    return rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      email: r.email || void 0,
+      avatarUrl: r.avatar_url || void 0
+    }));
+  }
+  getDirectExpenses(userId1, userId2) {
+    const rows = this.db.prepare(`
+      SELECT DISTINCT e.*
+      FROM expenses e
+      WHERE (e.group_id IS NULL OR e.group_id = '' OR e.group_id = '0')
+        AND e.id IN (
+          SELECT expense_id FROM expense_payers WHERE user_id IN (?, ?)
+          UNION
+          SELECT expense_id FROM expense_splits WHERE user_id IN (?, ?)
+        )
+      ORDER BY e.created_at DESC
+    `).all(userId1, userId2, userId1, userId2);
+    return rows.map((r) => this.hydrateExpense(r));
+  }
+  getFriendBalance(currentUserId, friendId) {
+    const expenses = this.getAllExpenses();
+    let balance = 0;
+    for (const exp of expenses) {
+      const total = exp.totalAmount;
+      if (total <= 0) continue;
+      const currentUserPaid = exp.payers.find((p) => p.userId === currentUserId)?.amount || 0;
+      const friendPaid = exp.payers.find((p) => p.userId === friendId)?.amount || 0;
+      const currentUserOwed = exp.splits.find((s) => s.userId === currentUserId)?.amount || 0;
+      const friendOwed = exp.splits.find((s) => s.userId === friendId)?.amount || 0;
+      if (currentUserPaid > 0 && friendOwed > 0) {
+        balance += friendOwed * currentUserPaid / total;
+      }
+      if (friendPaid > 0 && currentUserOwed > 0) {
+        balance -= currentUserOwed * friendPaid / total;
+      }
+    }
+    return Math.round(balance * 100) / 100;
+  }
+  getFriendSummaries(currentUserId) {
+    const friends = this.getFriends(currentUserId);
+    return friends.map((f) => ({
+      friend: f,
+      netBalance: this.getFriendBalance(currentUserId, f.id),
+      currency: "INR"
+    }));
+  }
+  // --- Comments ---
+  addComment(expenseId, userId, content) {
+    const id = randomUUID();
+    const createdAt = /* @__PURE__ */ new Date();
+    this.db.prepare("INSERT INTO comments (id, expense_id, user_id, content, created_at) VALUES (?, ?, ?, ?, ?)").run(
+      id,
+      expenseId,
+      userId,
+      content,
+      createdAt.toISOString()
+    );
+    const user = this.getUserById(userId);
+    return {
+      id,
+      expenseId,
+      userId,
+      userName: user?.name || userId,
+      userAvatar: user?.avatarUrl,
+      content,
+      createdAt
+    };
+  }
+  getComments(expenseId) {
+    const rows = this.db.prepare(`
+      SELECT c.id, c.expense_id, c.user_id, c.content, c.created_at, u.name, u.avatar_url
+      FROM comments c
+      LEFT JOIN users u ON c.user_id = u.id
+      WHERE c.expense_id = ?
+      ORDER BY c.created_at ASC
+    `).all(expenseId);
+    return rows.map((r) => ({
+      id: r.id,
+      expenseId: r.expense_id,
+      userId: r.user_id,
+      userName: r.name || r.user_id,
+      userAvatar: r.avatar_url || void 0,
+      content: r.content,
+      createdAt: new Date(r.created_at)
+    }));
+  }
+  deleteComment(commentId) {
+    const res = this.db.prepare("DELETE FROM comments WHERE id = ?").run(commentId);
+    return res.changes > 0;
+  }
   clearAllData() {
     this.db.exec(`
+      DELETE FROM comments;
+      DELETE FROM friendships;
       DELETE FROM expense_splits;
       DELETE FROM expense_payers;
       DELETE FROM expenses;
@@ -484,6 +610,12 @@ function seedDatabase() {
   const charlie = db.createUser({ id: "u_charlie", name: "Charlie", email: "charlie@example.com", avatarUrl: "\u{1F3B8}" });
   const diana = db.createUser({ id: "u_diana", name: "Diana", email: "diana@example.com", avatarUrl: "\u{1F4F8}" });
   const allUserIds = [yash.id, alice.id, bob.id, charlie.id, diana.id];
+  db.addFriend(yash.id, alice.id);
+  db.addFriend(yash.id, bob.id);
+  db.addFriend(yash.id, charlie.id);
+  db.addFriend(yash.id, diana.id);
+  db.addFriend(alice.id, bob.id);
+  db.addFriend(charlie.id, diana.id);
   const trip = db.createGroup({
     id: "grp_goa_trip",
     name: "Goa Beach Trip \u{1F334}",
@@ -533,7 +665,7 @@ function seedDatabase() {
     splitType: "EQUAL",
     splits: calculateEqualSplit(4e3, allUserIds)
   });
-  db.createExpense({
+  const exp5 = db.createExpense({
     groupId: trip.id,
     description: "Curlies Sunset Cocktails & Appetizers",
     totalAmount: 2500,
@@ -543,6 +675,28 @@ function seedDatabase() {
     splitType: "EQUAL",
     splits: calculateEqualSplit(2500, allUserIds)
   });
+  const directExp = db.createExpense({
+    description: "Airport Prepaid Cab (Goa Airport to Villa)",
+    totalAmount: 1200,
+    currency: "INR",
+    category: "Transport",
+    payers: [{ userId: yash.id, amount: 1200 }],
+    splitType: "EQUAL",
+    splits: calculateEqualSplit(1200, [yash.id, alice.id])
+  });
+  const allGroupExpenses = db.getGroupExpenses(trip.id);
+  const villaExp = allGroupExpenses.find((e) => e.description.includes("Villa"));
+  const dinnerExp = allGroupExpenses.find((e) => e.description.includes("Seafood"));
+  if (villaExp) {
+    db.addComment(villaExp.id, alice.id, "The ocean view from the terrace was breathtaking! \u{1F30A}");
+    db.addComment(villaExp.id, yash.id, "Totally worth it! Glad everyone loved the private pool.");
+  }
+  if (dinnerExp) {
+    db.addComment(dinnerExp.id, charlie.id, "Best butter garlic prawns in North Goa! \u{1F364}");
+  }
+  if (directExp) {
+    db.addComment(directExp.id, alice.id, "Thanks for booking the cab Yash, split added! \u{1F695}");
+  }
   const expenses = db.getGroupExpenses(trip.id);
   console.log(` Added ${expenses.length} expenses to "${trip.name}".`);
   const summary = analyzeGroupSettlement(expenses);
@@ -659,9 +813,9 @@ app.get("/api/groups/:id/expenses", (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
-app.post("/api/groups/:id/expenses", (req, res) => {
+function handleCreateExpense(req, res, forcedGroupId) {
   try {
-    const groupId = req.params.id;
+    const groupId = forcedGroupId !== void 0 ? forcedGroupId : req.body.groupId === "0" ? void 0 : req.body.groupId;
     const {
       description,
       totalAmount,
@@ -686,8 +840,11 @@ app.post("/api/groups/:id/expenses", (req, res) => {
         return res.status(400).json({ success: false, error: "Valid split items or participants list is required" });
       }
     }
+    if (!groupId && participants && participants.length >= 2) {
+      db.addFriend(participants[0], participants[1]);
+    }
     const expense = db.createExpense({
-      groupId,
+      groupId: groupId || void 0,
       description,
       totalAmount: Number(totalAmount),
       currency: currency || "INR",
@@ -700,6 +857,12 @@ app.post("/api/groups/:id/expenses", (req, res) => {
   } catch (err) {
     res.status(400).json({ success: false, error: err.message });
   }
+}
+app.post("/api/groups/:id/expenses", (req, res) => {
+  handleCreateExpense(req, res, req.params.id);
+});
+app.post("/api/expenses", (req, res) => {
+  handleCreateExpense(req, res);
 });
 app.delete("/api/expenses/:id", (req, res) => {
   try {
@@ -773,6 +936,82 @@ app.post("/api/groups/:id/settle", (req, res) => {
     }
     const expense = db.recordSettlement(groupId, fromUserId, toUserId, Number(amount), currency);
     res.status(201).json({ success: true, data: expense });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.get("/api/friends", (req, res) => {
+  try {
+    const currentUserId = req.query.userId || db.getUsers()[0]?.id;
+    if (!currentUserId) {
+      return res.json({ success: true, data: [] });
+    }
+    const friendSummaries = db.getFriendSummaries(currentUserId);
+    res.json({ success: true, data: friendSummaries });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.post("/api/friends", (req, res) => {
+  try {
+    const { userId1, userId2 } = req.body;
+    if (!userId1 || !userId2) {
+      return res.status(400).json({ success: false, error: "Both userId1 and userId2 are required" });
+    }
+    db.addFriend(userId1, userId2);
+    res.status(201).json({ success: true, message: "Friendship created" });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.get("/api/friends/:id/expenses", (req, res) => {
+  try {
+    const friendId = req.params.id;
+    const currentUserId = req.query.userId || db.getUsers()[0]?.id;
+    const directExpenses = db.getDirectExpenses(currentUserId, friendId);
+    res.json({ success: true, data: directExpenses });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.get("/api/friends/:id/balance", (req, res) => {
+  try {
+    const friendId = req.params.id;
+    const currentUserId = req.query.userId || db.getUsers()[0]?.id;
+    const balance = db.getFriendBalance(currentUserId, friendId);
+    res.json({ success: true, data: { userId: currentUserId, friendId, netBalance: balance } });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.get("/api/expenses/:id/comments", (req, res) => {
+  try {
+    const comments = db.getComments(req.params.id);
+    res.json({ success: true, data: comments });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.post("/api/expenses/:id/comments", (req, res) => {
+  try {
+    const expenseId = req.params.id;
+    const { userId, content } = req.body;
+    if (!userId || !content || !content.trim()) {
+      return res.status(400).json({ success: false, error: "userId and non-empty content are required" });
+    }
+    const comment = db.addComment(expenseId, userId, content.trim());
+    res.status(201).json({ success: true, data: comment });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.delete("/api/comments/:id", (req, res) => {
+  try {
+    const ok = db.deleteComment(req.params.id);
+    if (!ok) {
+      return res.status(404).json({ success: false, error: "Comment not found" });
+    }
+    res.json({ success: true, message: "Comment deleted successfully" });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

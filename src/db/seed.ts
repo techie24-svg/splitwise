@@ -15,6 +15,14 @@ export function seedDatabase() {
 
   const allUserIds = [yash.id, alice.id, bob.id, charlie.id, diana.id];
 
+  // Friendships
+  db.addFriend(yash.id, alice.id);
+  db.addFriend(yash.id, bob.id);
+  db.addFriend(yash.id, charlie.id);
+  db.addFriend(yash.id, diana.id);
+  db.addFriend(alice.id, bob.id);
+  db.addFriend(charlie.id, diana.id);
+
   // 2. Create Group
   const trip = db.createGroup({
     id: 'grp_goa_trip',
@@ -77,7 +85,7 @@ export function seedDatabase() {
   });
 
   // Expense 5: Sunset Cocktails & Snacks - Diana paid 2500, all 5 split
-  db.createExpense({
+  const exp5 = db.createExpense({
     groupId: trip.id,
     description: 'Curlies Sunset Cocktails & Appetizers',
     totalAmount: 2500,
@@ -87,6 +95,35 @@ export function seedDatabase() {
     splitType: 'EQUAL',
     splits: calculateEqualSplit(2500, allUserIds),
   });
+
+  // Direct 1-on-1 Expense (Outside of Group: group_id is null)
+  const directExp = db.createExpense({
+    description: 'Airport Prepaid Cab (Goa Airport to Villa)',
+    totalAmount: 1200,
+    currency: 'INR',
+    category: 'Transport',
+    payers: [{ userId: yash.id, amount: 1200 }],
+    splitType: 'EQUAL',
+    splits: calculateEqualSplit(1200, [yash.id, alice.id]),
+  });
+
+  // Comments on expenses
+  const allGroupExpenses = db.getGroupExpenses(trip.id);
+  const villaExp = allGroupExpenses.find((e) => e.description.includes('Villa'));
+  const dinnerExp = allGroupExpenses.find((e) => e.description.includes('Seafood'));
+
+  if (villaExp) {
+    db.addComment(villaExp.id, alice.id, 'The ocean view from the terrace was breathtaking! 🌊');
+    db.addComment(villaExp.id, yash.id, 'Totally worth it! Glad everyone loved the private pool.');
+  }
+
+  if (dinnerExp) {
+    db.addComment(dinnerExp.id, charlie.id, 'Best butter garlic prawns in North Goa! 🍤');
+  }
+
+  if (directExp) {
+    db.addComment(directExp.id, alice.id, 'Thanks for booking the cab Yash, split added! 🚕');
+  }
 
   const expenses = db.getGroupExpenses(trip.id);
   console.log(` Added ${expenses.length} expenses to "${trip.name}".`);

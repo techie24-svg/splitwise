@@ -22,49 +22,84 @@
         </div>
         <div class="brand-text">
           <h1>Splitwise<span>Core</span></h1>
-          <p class="tagline">Min-Cash-Flow Debt Simplification Engine</p>
+          <p class="tagline">Min-Cash-Flow Optimization • 1-on-1 Friends • Comments</p>
         </div>
       </div>
 
       <div class="header-actions">
-        <div class="group-select-wrapper">
-          <label for="groupSelect">Active Group:</label>
-          <select id="groupSelect"></select>
+        <!-- Group Context Actions -->
+        <div id="groupActionsWrapper" class="context-actions">
+          <div class="select-wrapper">
+            <label for="groupSelect">Active Group:</label>
+            <select id="groupSelect"></select>
+          </div>
+          <button id="btnNewExpense" class="btn btn-primary">
+            <span class="icon">+</span> Add Expense
+          </button>
+          <button id="btnNewGroup" class="btn btn-secondary">
+            <span class="icon">👥</span> New Group
+          </button>
         </div>
-        <button id="btnNewExpense" class="btn btn-primary">
-          <span class="icon">+</span> Add Expense
-        </button>
-        <button id="btnNewGroup" class="btn btn-secondary">
-          <span class="icon">👥</span> New Group
-        </button>
+
+        <!-- Friend Context Actions (Visible in 1-on-1 view) -->
+        <div id="friendActionsWrapper" class="context-actions hidden">
+          <div class="select-wrapper">
+            <label for="friendSelect">Active Friend:</label>
+            <select id="friendSelect"></select>
+          </div>
+          <button id="btnNewDirectExpense" class="btn btn-primary">
+            <span class="icon">+</span> Add 1:1 Expense
+          </button>
+          <button id="btnNewFriend" class="btn btn-secondary">
+            <span class="icon">🤝</span> Add Friend
+          </button>
+        </div>
+
         <button id="btnReseed" class="btn btn-outline" title="Reseed sample Goa trip dataset">
           <span class="icon">🔄</span> Reset Demo
         </button>
       </div>
     </header>
 
+    <!-- Navigation & User Switcher Bar -->
+    <div class="nav-tabs-bar">
+      <div class="nav-tabs">
+        <button id="tabGroups" class="nav-tab active">
+          <span class="tab-icon">🌴</span> Group Ledgers
+        </button>
+        <button id="tabFriends" class="nav-tab">
+          <span class="tab-icon">👥</span> 1-on-1 Friends & Balances
+        </button>
+      </div>
+
+      <div class="current-user-box">
+        <label for="currentUserSelect">👤 Logged In As:</label>
+        <select id="currentUserSelect"></select>
+      </div>
+    </div>
+
     <!-- Top Metric Ribbon -->
     <section class="metrics-ribbon">
       <div class="metric-card">
-        <span class="metric-label">Total Group Spend</span>
+        <span class="metric-label" id="metricLabel1">Total Group Spend</span>
         <span id="metricTotalSpend" class="metric-value">₹0.00</span>
         <span id="metricExpenseCount" class="metric-sub">0 recorded expenses</span>
       </div>
 
       <div class="metric-card">
-        <span class="metric-label">Unsimplified Debt Volume</span>
+        <span class="metric-label" id="metricLabel2">Debt Volume</span>
         <span id="metricDebtVolume" class="metric-value">₹0.00</span>
-        <span id="metricUnsimplifiedCount" class="metric-sub">0 peer-to-peer transfers</span>
+        <span id="metricUnsimplifiedCount" class="metric-sub">0 transfers</span>
       </div>
 
       <div class="metric-card highlight">
-        <span class="metric-label">Min-Cash-Flow Optimization</span>
+        <span class="metric-label" id="metricLabel3">Min-Cash-Flow Efficiency</span>
         <span id="metricOptimization" class="metric-value">0% Reduction</span>
-        <span id="metricSimplifiedCount" class="metric-sub">Optimized to 0 transactions</span>
+        <span id="metricSimplifiedCount" class="metric-sub">0 transactions</span>
       </div>
 
       <div class="metric-card">
-        <span class="metric-label">Group Members</span>
+        <span class="metric-label" id="metricLabel4">Active Connections</span>
         <span id="metricMemberCount" class="metric-value">0</span>
         <span id="metricCurrency" class="metric-sub">Currency: INR (₹)</span>
       </div>
@@ -72,16 +107,16 @@
 
     <!-- Main Content Layout -->
     <main class="dashboard-grid">
-      <!-- Left Column: Debt Settlement Graph & Net Balances -->
+      <!-- Left Column: Settlement / Balance Graph -->
       <section class="card debt-section">
         <div class="card-header">
           <div class="card-title-group">
-            <h2>Settlement Transfers</h2>
-            <p class="section-desc">How to settle all debts with minimum transactions</p>
+            <h2 id="leftColumnTitle">Settlement Transfers</h2>
+            <p class="section-desc" id="leftColumnDesc">How to settle all debts with minimum transactions</p>
           </div>
-          <div class="view-toggle">
+          <div id="viewToggleWrapper" class="view-toggle">
             <button id="toggleSimplified" class="toggle-btn active" data-mode="simplified">
-              ✨ Simplified (Optimal)
+              ✨ Simplified
             </button>
             <button id="toggleUnsimplified" class="toggle-btn" data-mode="unsimplified">
               Unsimplified
@@ -90,13 +125,13 @@
         </div>
 
         <div id="debtsContainer" class="debts-flow-container">
-          <!-- Dynamically populated debt cards -->
+          <!-- Dynamically populated debt cards or friend cards -->
         </div>
 
         <div class="net-balances-wrapper">
           <div class="sub-header">
-            <h3>Participant Net Balances</h3>
-            <span class="sub-desc">Sum of all net balances is strictly ₹0.00</span>
+            <h3 id="netBalancesTitle">Participant Net Balances</h3>
+            <span class="sub-desc" id="netBalancesDesc">Sum of all net balances is strictly ₹0.00</span>
           </div>
           <div id="netBalancesContainer" class="net-balances-grid">
             <!-- Dynamically populated net balance badges -->
@@ -104,12 +139,12 @@
         </div>
       </section>
 
-      <!-- Right Column: Expense Timeline -->
+      <!-- Right Column: Expense Timeline with Comments -->
       <section class="card expenses-section">
         <div class="card-header">
           <div class="card-title-group">
-            <h2>Expense History</h2>
-            <p class="section-desc">Itemized breakdown of group activities & payments</p>
+            <h2 id="rightColumnTitle">Expense History</h2>
+            <p class="section-desc" id="rightColumnDesc">Itemized activity, splits & comment threads</p>
           </div>
           <button id="btnQuickSettle" class="btn btn-sm btn-accent">
             🤝 Settle Up
@@ -117,7 +152,7 @@
         </div>
 
         <div id="expensesTimeline" class="expenses-list">
-          <!-- Dynamically populated expense items -->
+          <!-- Dynamically populated expense items with comments -->
         </div>
       </section>
     </main>
@@ -127,7 +162,7 @@
   <div id="modalExpense" class="modal-backdrop hidden">
     <div class="modal">
       <div class="modal-header">
-        <h3>Add an Expense</h3>
+        <h3 id="modalExpenseTitle">Add an Expense</h3>
         <button class="modal-close" data-close="modalExpense">&times;</button>
       </div>
       <form id="formExpense" class="modal-body">
@@ -154,9 +189,18 @@
           </div>
         </div>
 
-        <div class="form-group">
-          <label for="expPayer">Paid By</label>
-          <select id="expPayer" required></select>
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label for="expScope">Expense Type / Scope</label>
+            <select id="expScope">
+              <option value="group">🌴 In Group</option>
+              <option value="friend">👥 1-on-1 Friend Expense</option>
+            </select>
+          </div>
+          <div class="form-group flex-1">
+            <label for="expPayer">Paid By</label>
+            <select id="expPayer" required></select>
+          </div>
         </div>
 
         <div class="form-group">
@@ -264,6 +308,26 @@
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-close="modalGroup">Cancel</button>
           <button type="submit" class="btn btn-primary">Create Group</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Add Friend -->
+  <div id="modalFriend" class="modal-backdrop hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Add Friend (1-on-1)</h3>
+        <button class="modal-close" data-close="modalFriend">&times;</button>
+      </div>
+      <form id="formFriend" class="modal-body">
+        <div class="form-group">
+          <label for="newFriendSelect">Choose User to Add as Friend</label>
+          <select id="newFriendSelect" required></select>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close="modalFriend">Cancel</button>
+          <button type="submit" class="btn btn-primary">Connect Friendship</button>
         </div>
       </form>
     </div>

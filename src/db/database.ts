@@ -1,6 +1,6 @@
 import { DatabaseSync } from 'node:sqlite';
 import { randomUUID } from 'node:crypto';
-import type { User, Group, Expense, Payer, SplitItem, SplitType } from '../models/types.ts';
+import type { User, Group, Expense, Payer, SplitItem, SplitType, Comment, FriendBalance } from '../models/types.ts';
 
 export class SplitwiseDB {
   private db: DatabaseSync;
@@ -65,6 +65,21 @@ export class SplitwiseDB {
         amount REAL NOT NULL,
         percentage REAL,
         shares REAL
+      );
+
+      CREATE TABLE IF NOT EXISTS friendships (
+        user_id1 TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        user_id2 TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        PRIMARY KEY (user_id1, user_id2)
+      );
+
+      CREATE TABLE IF NOT EXISTS comments (
+        id TEXT PRIMARY KEY,
+        expense_id TEXT NOT NULL REFERENCES expenses(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        content TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
       );
     `);
   }
@@ -288,8 +303,139 @@ export class SplitwiseDB {
     };
   }
 
+  // --- Friendships & 1-on-1 Expenses ---
+  public addFriend(userId1: string, userId2: string): void {
+    if (userId1 === userId2) return;
+    const [u1, u2] = [userId1, userId2].sort();
+    this.db.prepare('INSERT OR IGNORE INTO friendships (user_id1, user_id2) VALUES (?, ?)').run(u1, u2);
+  }
+
+  public getFriends(userId: string): User[] {
+    const rows = this.db.prepare(`
+      SELECT u.id, u.name, u.email, u.avatar_url
+      FROM users u
+      WHERE u.id IN (
+        SELECT user_id2 FROM friendships WHERE user_id1 = ?
+        UNION
+        SELECT user_id1 FROM friendships WHERE user_id2 = ?
+      )
+      ORDER BY u.name ASC
+    `).all(userId, userId) as any[];
+
+    return rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      email: r.email || undefined,
+      avatarUrl: r.avatar_url || undefined,
+    }));
+  }
+
+  public getDirectExpenses(userId1: string, userId2: string): Expense[] {
+    // Non-group expenses involving both users
+    const rows = this.db.prepare(`
+      SELECT DISTINCT e.*
+      FROM expenses e
+      WHERE (e.group_id IS NULL OR e.group_id = '' OR e.group_id = '0')
+        AND e.id IN (
+          SELECT expense_id FROM expense_payers WHERE user_id IN (?, ?)
+          UNION
+          SELECT expense_id FROM expense_splits WHERE user_id IN (?, ?)
+        )
+      ORDER BY e.created_at DESC
+    `).all(userId1, userId2, userId1, userId2) as any[];
+
+    return rows.map((r) => this.hydrateExpense(r));
+  }
+
+  public getFriendBalance(currentUserId: string, friendId: string): number {
+    // Computes pairwise balance between currentUserId and friendId across ALL expenses
+    const expenses = this.getAllExpenses();
+    let balance = 0;
+
+    for (const exp of expenses) {
+      const total = exp.totalAmount;
+      if (total <= 0) continue;
+
+      const currentUserPaid = exp.payers.find((p) => p.userId === currentUserId)?.amount || 0;
+      const friendPaid = exp.payers.find((p) => p.userId === friendId)?.amount || 0;
+
+      const currentUserOwed = exp.splits.find((s) => s.userId === currentUserId)?.amount || 0;
+      const friendOwed = exp.splits.find((s) => s.userId === friendId)?.amount || 0;
+
+      if (currentUserPaid > 0 && friendOwed > 0) {
+        balance += (friendOwed * currentUserPaid) / total;
+      }
+
+      if (friendPaid > 0 && currentUserOwed > 0) {
+        balance -= (currentUserOwed * friendPaid) / total;
+      }
+    }
+
+    return Math.round(balance * 100) / 100;
+  }
+
+  public getFriendSummaries(currentUserId: string): FriendBalance[] {
+    const friends = this.getFriends(currentUserId);
+    return friends.map((f) => ({
+      friend: f,
+      netBalance: this.getFriendBalance(currentUserId, f.id),
+      currency: 'INR',
+    }));
+  }
+
+  // --- Comments ---
+  public addComment(expenseId: string, userId: string, content: string): Comment {
+    const id = randomUUID();
+    const createdAt = new Date();
+    this.db.prepare('INSERT INTO comments (id, expense_id, user_id, content, created_at) VALUES (?, ?, ?, ?, ?)').run(
+      id,
+      expenseId,
+      userId,
+      content,
+      createdAt.toISOString()
+    );
+
+    const user = this.getUserById(userId);
+    return {
+      id,
+      expenseId,
+      userId,
+      userName: user?.name || userId,
+      userAvatar: user?.avatarUrl,
+      content,
+      createdAt,
+    };
+  }
+
+  public getComments(expenseId: string): Comment[] {
+    const rows = this.db.prepare(`
+      SELECT c.id, c.expense_id, c.user_id, c.content, c.created_at, u.name, u.avatar_url
+      FROM comments c
+      LEFT JOIN users u ON c.user_id = u.id
+      WHERE c.expense_id = ?
+      ORDER BY c.created_at ASC
+    `).all(expenseId) as any[];
+
+    return rows.map((r) => ({
+      id: r.id,
+      expenseId: r.expense_id,
+      userId: r.user_id,
+      userName: r.name || r.user_id,
+      userAvatar: r.avatar_url || undefined,
+      content: r.content,
+      createdAt: new Date(r.created_at),
+    }));
+  }
+
+  public deleteComment(commentId: string): boolean {
+    const res = this.db.prepare('DELETE FROM comments WHERE id = ?').run(commentId);
+    return res.changes > 0;
+  }
+
   public clearAllData(): void {
     this.db.exec(`
+      DELETE FROM comments;
+      DELETE FROM friendships;
       DELETE FROM expense_splits;
       DELETE FROM expense_payers;
       DELETE FROM expenses;

@@ -63,3 +63,20 @@ export interface SettlementSummary {
   totalVolume: number;
   reductionPercentage: number;
 }
+
+export interface Comment {
+  id: string;
+  expenseId: string;
+  userId: string;
+  userName?: string;
+  userAvatar?: string;
+  content: string;
+  createdAt: Date;
+}
+
+export interface FriendBalance {
+  friend: User;
+  netBalance: number; // > 0: friend owes you, < 0: you owe friend
+  currency: string;
+}
+
