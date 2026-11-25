@@ -1436,9 +1436,10 @@ body {
 }
 
 .sw-landing-header {
-  background-color: var(--sw-teal);
-  height: 60px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  background-color: #ffffff;
+  height: 64px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  border-bottom: 1px solid #e0e0e0;
 }
 
 .sw-landing-header-container {
@@ -1459,30 +1460,38 @@ body {
 
 .sw-btn-landing-login {
   background: transparent;
-  color: #ffffff;
-  border: 1px solid rgba(255, 255, 255, 0.5);
+  color: #1cc29f;
+  border: 1px solid transparent;
   border-radius: var(--sw-radius-sm);
-  padding: 7px 16px;
+  padding: 8px 18px;
   font-family: inherit;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 .sw-btn-landing-login:hover {
-  background: rgba(255, 255, 255, 0.15);
-  border-color: #ffffff;
+  color: #159378;
+  text-decoration: underline;
 }
 
 .sw-btn-landing-signup {
-  background-color: #ffffff;
-  color: var(--sw-teal);
+  background-color: #1cc29f;
+  color: #ffffff;
   border: none;
-  border-radius: var(--sw-radius-sm);
-  padding: 8px 18px;
+  border-radius: 6px;
+  padding: 9px 20px;
   font-family: inherit;
-  font-size: 14px;
-  font-weight: 800;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(28, 194, 159, 0.25);
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+.sw-btn-landing-signup:hover {
+  background-color: #17a98a;
+  transform: translateY(-1px);
+}
   cursor: pointer;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   transition: all 0.15s ease;

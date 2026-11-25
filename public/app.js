@@ -157,6 +157,32 @@ const formAddFriend = document.getElementById('formAddFriend');
 // App Initialization
 document.addEventListener('DOMContentLoaded', async () => {
   setupEventListeners();
+
+  // Fetch Google Client ID from server config or localStorage
+  try {
+    const configRes = await fetch('/api/config/google-client-id');
+    const configData = await configRes.json();
+    let effectiveClientId = configData.clientId || localStorage.getItem('splitwise_google_client_id') || '';
+    if (effectiveClientId) {
+      window.__SPLITWISE_GOOGLE_CLIENT_ID = effectiveClientId;
+      if (!configData.clientId) {
+        // Sync to server so server knows it
+        fetch('/api/config/google-client-id', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ clientId: effectiveClientId }),
+        }).catch(() => {});
+      }
+      if (typeof google !== 'undefined') {
+        initializeGoogleSignIn();
+      } else {
+        window.addEventListener('load', () => setTimeout(initializeGoogleSignIn, 300));
+      }
+    }
+  } catch (e) {
+    console.warn('Could not fetch Google Client ID config:', e);
+  }
+
   await checkAuthSession();
 });
 
@@ -207,15 +233,18 @@ function setupEventListeners() {
   btnLandingSignup?.addEventListener('click', () => modalSignup.classList.remove('hidden'));
   btnHeroSignup?.addEventListener('click', () => modalSignup.classList.remove('hidden'));
 
-  // Google Sign-in buttons
-  btnHeroGoogle?.addEventListener('click', () => modalGoogleAccount.classList.remove('hidden'));
+  // Google Sign-in buttons — trigger real Google OAuth
+  btnHeroGoogle?.addEventListener('click', () => triggerGoogleSignIn());
   btnLoginGoogle?.addEventListener('click', () => {
     modalLogin.classList.add('hidden');
-    modalGoogleAccount.classList.remove('hidden');
+    triggerGoogleSignIn();
   });
   btnSignupGoogle?.addEventListener('click', () => {
     modalSignup.classList.add('hidden');
-    modalGoogleAccount.classList.remove('hidden');
+    triggerGoogleSignIn();
+  });
+  document.getElementById('btnLaunchGooglePopup')?.addEventListener('click', () => {
+    launchGoogleOAuthPopup();
   });
 
   document.getElementById('linkSwitchToSignup')?.addEventListener('click', (e) => {
@@ -394,37 +423,180 @@ function setupEventListeners() {
   });
 }
 
-window.executeGoogleLogin = async function (name, email, avatarUrl) {
+// ===== REAL GOOGLE OAUTH via Google Identity Services (GIS) =====
+let gisInitialized = false;
+
+function getActiveGoogleClientId() {
+  return window.__SPLITWISE_GOOGLE_CLIENT_ID || localStorage.getItem('splitwise_google_client_id') || '';
+}
+
+// Complete login session with Google result
+async function completeGoogleLogin(bodyPayload) {
+  const res = await fetch('/api/auth/google', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(bodyPayload),
+  });
+
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Google login failed');
+
+  authToken = data.data.token;
+  currentUser = data.data.user;
+  localStorage.setItem('splitwise_auth_token', authToken);
+
+  modalGoogleAccount?.classList.add('hidden');
+  modalLogin?.classList.add('hidden');
+  modalSignup?.classList.add('hidden');
+  showAuthenticatedUI();
+  await loadInitialData();
+}
+
+// Called by GIS credential callback (ID Token JWT)
+window.handleGoogleCredentialResponse = async function (response) {
   try {
-    const res = await fetch('/api/auth/google', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email, avatarUrl, googleId: `google_${Date.now()}` }),
-    });
-
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Google login failed');
-
-    authToken = data.data.token;
-    currentUser = data.data.user;
-    localStorage.setItem('splitwise_auth_token', authToken);
-
-    modalGoogleAccount?.classList.add('hidden');
-    modalLogin?.classList.add('hidden');
-    modalSignup?.classList.add('hidden');
-    showAuthenticatedUI();
-    await loadInitialData();
+    await completeGoogleLogin({ credential: response.credential });
   } catch (err) {
-    alert('Google login error: ' + err.message);
+    alert('Google sign-in error: ' + err.message);
   }
 };
 
-window.handleCustomGoogleSubmit = function (e) {
+// Called when Google OAuth2 Token Client returns an Access Token
+async function handleGoogleAccessToken(accessToken) {
+  try {
+    await completeGoogleLogin({ accessToken });
+  } catch (err) {
+    alert('Google sign-in error: ' + err.message);
+  }
+}
+
+// Initialize Google Identity Services
+function initializeGoogleSignIn() {
+  const clientId = getActiveGoogleClientId();
+  if (!clientId || typeof google === 'undefined') return;
+
+  try {
+    google.accounts.id.initialize({
+      client_id: clientId,
+      callback: handleGoogleCredentialResponse,
+      auto_select: false,
+      cancel_on_tap_outside: true,
+    });
+
+    const container = document.getElementById('gisButtonContainer');
+    if (container) {
+      container.innerHTML = '';
+      google.accounts.id.renderButton(container, {
+        theme: 'outline',
+        size: 'large',
+        width: 300,
+        text: 'continue_with',
+        shape: 'rectangular',
+        logo_alignment: 'left',
+      });
+    }
+    gisInitialized = true;
+  } catch (e) {
+    console.warn('Google Identity Services initialization notice:', e);
+  }
+}
+
+// Launch Google OAuth popup directly via token client
+function launchGoogleOAuthPopup() {
+  const clientId = getActiveGoogleClientId();
+  if (!clientId) {
+    updateGoogleModalUI();
+    modalGoogleAccount?.classList.remove('hidden');
+    return;
+  }
+
+  if (typeof google !== 'undefined' && google.accounts?.oauth2) {
+    try {
+      const tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: clientId,
+        scope: 'email profile openid',
+        callback: async (tokenResponse) => {
+          if (tokenResponse.error) {
+            console.warn('Google token notice:', tokenResponse.error);
+            return;
+          }
+          if (tokenResponse.access_token) {
+            await handleGoogleAccessToken(tokenResponse.access_token);
+          }
+        },
+      });
+      tokenClient.requestAccessToken();
+      return;
+    } catch (err) {
+      console.warn('Error launching tokenClient, falling back to ID prompt', err);
+    }
+  }
+
+  // Fallback: trigger GIS prompt
+  if (typeof google !== 'undefined' && google.accounts?.id) {
+    try {
+      google.accounts.id.prompt();
+    } catch (e) {}
+  }
+}
+
+// Update the Google modal depending on whether client ID is configured
+function updateGoogleModalUI() {
+  const clientId = getActiveGoogleClientId();
+  const setupSection = document.getElementById('googleSetupSection');
+  const activeContainer = document.getElementById('googleActiveContainer');
+  const originLabel = document.getElementById('currentOriginLabel');
+
+  if (originLabel) {
+    originLabel.innerText = window.location.origin;
+  }
+
+  if (clientId) {
+    setupSection?.classList.add('hidden');
+    activeContainer?.classList.remove('hidden');
+    if (!gisInitialized) {
+      initializeGoogleSignIn();
+    }
+  } else {
+    setupSection?.classList.remove('hidden');
+    activeContainer?.classList.add('hidden');
+  }
+}
+
+// Trigger Google Sign-in from any "Continue with Google" button
+window.triggerGoogleSignIn = function () {
+  const clientId = getActiveGoogleClientId();
+  modalGoogleAccount?.classList.remove('hidden');
+  updateGoogleModalUI();
+
+  if (clientId) {
+    launchGoogleOAuthPopup();
+  }
+};
+
+// Handle saving Client ID from UI
+window.handleSaveGoogleClientId = async function (e) {
   e.preventDefault();
-  const name = document.getElementById('customGoogleName')?.value.trim();
-  const email = document.getElementById('customGoogleEmail')?.value.trim();
-  if (name && email) {
-    executeGoogleLogin(name, email, '🌐');
+  const input = document.getElementById('inputGoogleClientId');
+  const newClientId = input?.value?.trim();
+  if (!newClientId) return;
+
+  try {
+    await fetch('/api/config/google-client-id', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clientId: newClientId }),
+    });
+
+    window.__SPLITWISE_GOOGLE_CLIENT_ID = newClientId;
+    localStorage.setItem('splitwise_google_client_id', newClientId);
+    gisInitialized = false;
+
+    initializeGoogleSignIn();
+    updateGoogleModalUI();
+    launchGoogleOAuthPopup();
+  } catch (err) {
+    alert('Error saving Google Client ID: ' + err.message);
   }
 };
 

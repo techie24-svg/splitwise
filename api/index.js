@@ -882,6 +882,19 @@ var PORT = process.env.PORT || 3e3;
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(rootDir, "public")));
+var runtimeGoogleClientId = process.env.GOOGLE_CLIENT_ID || "";
+app.get("/api/config/google-client-id", (req, res) => {
+  res.json({ clientId: runtimeGoogleClientId });
+});
+app.post("/api/config/google-client-id", (req, res) => {
+  const { clientId } = req.body;
+  if (typeof clientId === "string") {
+    runtimeGoogleClientId = clientId.trim();
+    process.env.GOOGLE_CLIENT_ID = runtimeGoogleClientId;
+    return res.json({ success: true, clientId: runtimeGoogleClientId });
+  }
+  res.status(400).json({ success: false, error: "clientId string is required" });
+});
 function getUserMap() {
   const users = db.getUsers();
   const map = /* @__PURE__ */ new Map();
@@ -943,21 +956,46 @@ app.post("/api/auth/login", (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
-app.post("/api/auth/google", (req, res) => {
+app.post("/api/auth/google", async (req, res) => {
   try {
-    let { name, email, avatarUrl, googleId, credential } = req.body;
+    let { name, email, avatarUrl, googleId, credential, accessToken } = req.body;
+    if (accessToken && typeof accessToken === "string") {
+      try {
+        const userInfoRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+          headers: { Authorization: `Bearer ${accessToken}` }
+        });
+        if (userInfoRes.ok) {
+          const userInfo = await userInfoRes.json();
+          email = userInfo.email || email;
+          name = userInfo.name || name;
+          avatarUrl = userInfo.picture || avatarUrl;
+          googleId = userInfo.sub || googleId;
+        }
+      } catch (e) {
+        console.warn("Error verifying Google accessToken via userinfo API:", e);
+      }
+    }
     if (credential && typeof credential === "string") {
       try {
-        const payloadBase64 = credential.split(".")[1];
-        if (payloadBase64) {
-          const decoded = JSON.parse(Buffer.from(payloadBase64, "base64").toString("utf8"));
-          email = decoded.email || email;
-          name = decoded.name || name;
-          avatarUrl = decoded.picture || avatarUrl;
-          googleId = decoded.sub || googleId;
+        const tokenInfoRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`);
+        if (tokenInfoRes.ok) {
+          const tokenInfo = await tokenInfoRes.json();
+          email = tokenInfo.email || email;
+          name = tokenInfo.name || name;
+          avatarUrl = tokenInfo.picture || avatarUrl;
+          googleId = tokenInfo.sub || googleId;
+        } else {
+          const payloadBase64 = credential.split(".")[1];
+          if (payloadBase64) {
+            const decoded = JSON.parse(Buffer.from(payloadBase64, "base64").toString("utf8"));
+            email = decoded.email || email;
+            name = decoded.name || name;
+            avatarUrl = decoded.picture || avatarUrl;
+            googleId = decoded.sub || googleId;
+          }
         }
       } catch (jwtErr) {
-        console.warn("Could not decode Google JWT credential, falling back to body fields", jwtErr);
+        console.warn("Could not verify Google credential:", jwtErr);
       }
     }
     if (!email || typeof email !== "string" || !email.includes("@")) {
