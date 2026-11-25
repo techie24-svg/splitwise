@@ -5,7 +5,7 @@
   "main": "src/demo.ts",
   "type": "module",
   "scripts": {
-    "build": "esbuild api/index.ts --bundle --platform=node --format=esm --packages=external --outfile=api/index.js",
+    "build": "esbuild src/vercel-handler.ts --bundle --platform=node --format=esm --packages=external --outfile=api/index.js",
     "start": "node --experimental-strip-types src/server.ts",
     "seed": "node --experimental-strip-types src/db/seed.ts",
     "test": "node --experimental-strip-types tests/simplifyDebts.test.ts && node --experimental-strip-types tests/database.test.ts",

@@ -801,8 +801,8 @@ if (process.argv[1]?.endsWith("server.ts")) {
 }
 var server_default = app;
 
-// api/index.ts
-var index_default = server_default;
+// src/vercel-handler.ts
+var vercel_handler_default = server_default;
 export {
-  index_default as default
+  vercel_handler_default as default
 };
