@@ -877,9 +877,9 @@ async function loadDashboardView() {
   simplificationFeed?.classList.add('hidden');
   tabViewSimplification?.classList.add('hidden');
 
-  topbarViewIcon.innerText = '';
+  if (topbarViewIcon) topbarViewIcon.innerText = '';
   centerTitle.innerText = 'Dashboard';
-  centerSubtitle.innerText = '';
+  if (centerSubtitle) centerSubtitle.innerText = '';
 
   const allExpRes = await authFetch('/api/expenses').then((r) => r.json());
   currentExpenses = allExpRes.data || [];
@@ -910,22 +910,22 @@ async function loadDashboardView() {
   if (Math.abs(netTotal) < 0.005) {
     ribbonTotalBalance.innerText = formatCurrency(0, currency);
     ribbonTotalBalance.className = 'sw-ribbon-val';
-    ribbonTotalBalanceSub.innerText = 'all settled up';
+    if (ribbonTotalBalanceSub) ribbonTotalBalanceSub.innerText = 'all settled up';
   } else if (netTotal > 0) {
     ribbonTotalBalance.innerText = `+${formatCurrency(netTotal, currency)}`;
     ribbonTotalBalance.className = 'sw-ribbon-val text-teal';
-    ribbonTotalBalanceSub.innerText = 'you are owed overall';
+    if (ribbonTotalBalanceSub) ribbonTotalBalanceSub.innerText = 'you are owed overall';
   } else {
     ribbonTotalBalance.innerText = `-${formatCurrency(Math.abs(netTotal), currency)}`;
     ribbonTotalBalance.className = 'sw-ribbon-val text-orange';
-    ribbonTotalBalanceSub.innerText = 'you owe overall';
+    if (ribbonTotalBalanceSub) ribbonTotalBalanceSub.innerText = 'you owe overall';
   }
 
   ribbonYouOwe.innerText = formatCurrency(totalYouOwe, currency);
-  ribbonYouOweSub.innerText = oweCount === 1 ? 'to 1 person' : `to ${oweCount} people`;
+  if (ribbonYouOweSub) ribbonYouOweSub.innerText = oweCount === 1 ? 'to 1 person' : `to ${oweCount} people`;
 
   ribbonYouAreOwed.innerText = formatCurrency(totalYouAreOwed, currency);
-  ribbonYouAreOwedSub.innerText = owedCount === 1 ? 'from 1 person' : `from ${owedCount} people`;
+  if (ribbonYouAreOwedSub) ribbonYouAreOwedSub.innerText = owedCount === 1 ? 'from 1 person' : `from ${owedCount} people`;
 
   // Populate Left Column: YOU OWE
   const emptyYouOwe = document.getElementById('emptyYouOwe');
@@ -990,20 +990,20 @@ async function loadDashboardView() {
 
 // 2. Recent Activity View (Audit Stream)
 async function loadRecentActivityView() {
-  topbarViewIcon.innerText = '⚡';
+  if (topbarViewIcon) topbarViewIcon.innerText = '⚡';
   centerTitle.innerText = 'Recent activity';
-  centerSubtitle.innerText = 'Live chronological audit stream of all activity';
+  if (centerSubtitle) centerSubtitle.innerText = 'Live chronological audit stream of all activity';
 
   feedSubheader.classList.add('hidden');
   expensesFeed.classList.add('hidden');
   activitiesFeed.classList.remove('hidden');
 
   ribbonTotalBalance.innerText = '⚡ Activity';
-  ribbonTotalBalanceSub.innerText = 'live event logging';
+  if (ribbonTotalBalanceSub) ribbonTotalBalanceSub.innerText = 'live event logging';
   ribbonYouOwe.innerText = `${friends.length} friends`;
-  ribbonYouOweSub.innerText = 'network';
+  if (ribbonYouOweSub) ribbonYouOweSub.innerText = 'network';
   ribbonYouAreOwed.innerText = `${groups.length} groups`;
-  ribbonYouAreOwedSub.innerText = 'active ledgers';
+  if (ribbonYouAreOwedSub) ribbonYouAreOwedSub.innerText = 'active ledgers';
 
   try {
     const res = await authFetch('/api/activities').then((r) => r.json());
@@ -1042,31 +1042,31 @@ async function loadRecentActivityView() {
     activitiesFeed.innerHTML = `<div class="sw-empty-state"><p>Error loading activity.</p></div>`;
   }
 
-  renderDashboardRightSidebar(0, 0, 0);
+  renderDashboardRightSidebar();
 }
 
 // 3. All Expenses View
 async function loadAllExpensesView() {
-  topbarViewIcon.innerText = '📜';
+  if (topbarViewIcon) topbarViewIcon.innerText = '📜';
   centerTitle.innerText = 'All expenses';
-  centerSubtitle.innerText = 'Complete timeline of bills and payments';
-  tabViewSimplification.classList.add('hidden');
+  if (centerSubtitle) centerSubtitle.innerText = 'Complete timeline of bills and payments';
+  tabViewSimplification?.classList.add('hidden');
 
   const allExpRes = await authFetch('/api/expenses').then((r) => r.json());
   currentExpenses = allExpRes.data || [];
 
   renderExpensesFeed();
-  renderDashboardRightSidebar(0, 0, 0);
+  renderDashboardRightSidebar();
 }
 
 // 4. Group View
 async function loadGroupView() {
   if (!activeGroup) return;
 
-  topbarViewIcon.innerText = '🌴';
+  if (topbarViewIcon) topbarViewIcon.innerText = '🌴';
   centerTitle.innerText = activeGroup.name;
-  centerSubtitle.innerText = `${activeGroup.description || 'Shared Ledger'} • ${activeGroup.members.length} members`;
-  tabViewSimplification.classList.remove('hidden');
+  if (centerSubtitle) centerSubtitle.innerText = `${activeGroup.description || 'Shared Ledger'} • ${activeGroup.members.length} members`;
+  tabViewSimplification?.classList.remove('hidden');
 
   try {
     const [expRes, settleRes] = await Promise.all([
@@ -1081,26 +1081,26 @@ async function loadGroupView() {
     const myNetInGroup = myBalanceObj ? myBalanceObj.balance : 0;
 
     if (Math.abs(myNetInGroup) < 0.005) {
-      ribbonTotalBalance.innerText = '₹0.00';
+      ribbonTotalBalance.innerText = '$0.00';
       ribbonTotalBalance.className = 'sw-ribbon-val';
-      ribbonTotalBalanceSub.innerText = 'settled up in this group';
+      if (ribbonTotalBalanceSub) ribbonTotalBalanceSub.innerText = 'settled up in this group';
     } else if (myNetInGroup > 0) {
       ribbonTotalBalance.innerText = `+${formatCurrency(myNetInGroup, activeGroup.currency)}`;
       ribbonTotalBalance.className = 'sw-ribbon-val text-teal';
-      ribbonTotalBalanceSub.innerText = 'you are owed in this group';
+      if (ribbonTotalBalanceSub) ribbonTotalBalanceSub.innerText = 'you are owed in this group';
     } else {
       ribbonTotalBalance.innerText = `-${formatCurrency(Math.abs(myNetInGroup), activeGroup.currency)}`;
       ribbonTotalBalance.className = 'sw-ribbon-val text-orange';
-      ribbonTotalBalanceSub.innerText = 'you owe in this group';
+      if (ribbonTotalBalanceSub) ribbonTotalBalanceSub.innerText = 'you owe in this group';
     }
 
     const groupSpend = currentExpenses.reduce((sum, e) => sum + (e.category === 'Payment' ? 0 : e.totalAmount), 0);
     ribbonYouOwe.innerText = formatCurrency(groupSpend, activeGroup.currency);
-    ribbonYouOweSub.innerText = `${currentExpenses.length} bills recorded`;
+    if (ribbonYouOweSub) ribbonYouOweSub.innerText = `${currentExpenses.length} bills recorded`;
 
     const stats = groupSettlement?.stats;
     ribbonYouAreOwed.innerText = `${stats?.reductionPercentage || 0}%`;
-    ribbonYouAreOwedSub.innerText = `Min-cash-flow reduction`;
+    if (ribbonYouAreOwedSub) ribbonYouAreOwedSub.innerText = `Min-cash-flow reduction`;
 
     renderExpensesFeed();
     renderGroupRightSidebar();
@@ -1113,10 +1113,10 @@ async function loadGroupView() {
 async function loadFriendView() {
   if (!activeFriend) return;
 
-  topbarViewIcon.innerText = activeFriend.friend.avatarUrl || '👤';
+  if (topbarViewIcon) topbarViewIcon.innerText = activeFriend.friend.avatarUrl || '👤';
   centerTitle.innerText = activeFriend.friend.name;
-  centerSubtitle.innerText = `Direct 1-on-1 balances and expenses`;
-  tabViewSimplification.classList.add('hidden');
+  if (centerSubtitle) centerSubtitle.innerText = `Direct 1-on-1 balances and expenses`;
+  tabViewSimplification?.classList.add('hidden');
 
   try {
     const expRes = await authFetch(`/api/friends/${activeFriend.friend.id}/expenses?userId=${currentUser.id}`).then((r) =>
@@ -1126,25 +1126,25 @@ async function loadFriendView() {
 
     const bal = activeFriend.netBalance || 0;
     if (Math.abs(bal) < 0.005) {
-      ribbonTotalBalance.innerText = '₹0.00';
+      ribbonTotalBalance.innerText = '$0.00';
       ribbonTotalBalance.className = 'sw-ribbon-val';
-      ribbonTotalBalanceSub.innerText = 'you two are all settled up';
+      if (ribbonTotalBalanceSub) ribbonTotalBalanceSub.innerText = 'you two are all settled up';
     } else if (bal > 0) {
       ribbonTotalBalance.innerText = `+${formatCurrency(bal)}`;
       ribbonTotalBalance.className = 'sw-ribbon-val text-teal';
-      ribbonTotalBalanceSub.innerText = `${activeFriend.friend.name} owes you`;
+      if (ribbonTotalBalanceSub) ribbonTotalBalanceSub.innerText = `${activeFriend.friend.name} owes you`;
     } else {
       ribbonTotalBalance.innerText = `-${formatCurrency(Math.abs(bal))}`;
       ribbonTotalBalance.className = 'sw-ribbon-val text-orange';
-      ribbonTotalBalanceSub.innerText = `you owe ${activeFriend.friend.name}`;
+      if (ribbonTotalBalanceSub) ribbonTotalBalanceSub.innerText = `you owe ${activeFriend.friend.name}`;
     }
 
     const directSpend = currentExpenses.reduce((sum, e) => sum + (e.category === 'Payment' ? 0 : e.totalAmount), 0);
     ribbonYouOwe.innerText = formatCurrency(directSpend);
-    ribbonYouOweSub.innerText = 'total direct spend';
+    if (ribbonYouOweSub) ribbonYouOweSub.innerText = 'total direct spend';
 
     ribbonYouAreOwed.innerText = `${currentExpenses.length}`;
-    ribbonYouAreOwedSub.innerText = 'shared transactions';
+    if (ribbonYouAreOwedSub) ribbonYouAreOwedSub.innerText = 'shared transactions';
 
     renderExpensesFeed();
     renderFriendRightSidebar();

@@ -189,6 +189,9 @@
               <button class="sw-btn-add-text" id="btnAddGroupLeft" title="Create new group">+ add</button>
             </div>
             <div class="sw-sidebar-list" id="sidebarGroupsList"></div>
+            <div class="sw-settled-notice">
+              <a href="#" class="sw-settled-link" onclick="event.preventDefault(); alert('Showing accounts settled for more than 30 days.');">Hiding accounts settled for more than 30 days. Show »</a>
+            </div>
           </div>
 
           <!-- FRIENDS Section -->
@@ -215,14 +218,10 @@
 
         <!-- COLUMN 2: CENTER MAIN EXPENSE FEED -->
         <main class="sw-col-center" id="centerColumn">
-          <!-- Top Action Header Bar -->
+          <!-- Top Action Header Bar (Exact match to after login page.png) -->
           <div class="sw-topbar">
             <div class="sw-topbar-left">
-              <div class="sw-view-icon" id="topbarViewIcon">📊</div>
-              <div class="sw-topbar-title-wrap">
-                <h1 class="sw-topbar-title" id="centerTitle">Dashboard</h1>
-                <span class="sw-topbar-subtitle" id="centerSubtitle">Overall balance and activity</span>
-              </div>
+              <h1 class="sw-topbar-title" id="centerTitle">Dashboard</h1>
             </div>
 
             <div class="sw-topbar-actions">
@@ -235,22 +234,19 @@
             </div>
           </div>
 
-          <!-- Splitwise Signature 3-Block Summary Ribbon -->
+          <!-- Splitwise Signature 3-Block Summary Ribbon (2-line clean layout matching screenshot) -->
           <div class="sw-summary-ribbon" id="summaryRibbon">
             <div class="sw-ribbon-block">
               <span class="sw-ribbon-label">total balance</span>
               <span class="sw-ribbon-val" id="ribbonTotalBalance">$0.00</span>
-              <span class="sw-ribbon-sub" id="ribbonTotalBalanceSub">all settled up</span>
             </div>
             <div class="sw-ribbon-block">
               <span class="sw-ribbon-label">you owe</span>
-              <span class="sw-ribbon-val text-orange" id="ribbonYouOwe">$0.00</span>
-              <span class="sw-ribbon-sub" id="ribbonYouOweSub">0 friends</span>
+              <span class="sw-ribbon-val" id="ribbonYouOwe">$0.00</span>
             </div>
             <div class="sw-ribbon-block">
               <span class="sw-ribbon-label">you are owed</span>
               <span class="sw-ribbon-val text-teal" id="ribbonYouAreOwed">$0.00</span>
-              <span class="sw-ribbon-sub" id="ribbonYouAreOwedSub">0 friends</span>
             </div>
           </div>
 
@@ -587,13 +583,12 @@
         <!-- Expense Hero Entry: Receipt Icon + Dashed Inputs -->
         <div class="sw-expense-hero-entry">
           <div class="sw-receipt-icon-box" id="categorySelectorTrigger" title="Category / Receipt">
-            <svg viewBox="0 0 48 56" width="44" height="52" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <rect x="2" y="2" width="44" height="52" rx="4" fill="#f8fafc" stroke="#94a3b8" stroke-width="2"/>
-              <line x1="8" y1="12" x2="40" y2="12" stroke="#64748b" stroke-width="2.5" stroke-linecap="round"/>
-              <line x1="8" y1="20" x2="30" y2="20" stroke="#cbd5e1" stroke-width="2" stroke-linecap="round"/>
-              <line x1="8" y1="28" x2="40" y2="28" stroke="#cbd5e1" stroke-width="2" stroke-linecap="round"/>
-              <line x1="8" y1="36" x2="24" y2="36" stroke="#cbd5e1" stroke-width="2" stroke-linecap="round"/>
-              <line x1="8" y1="44" x2="36" y2="44" stroke="#64748b" stroke-width="2" stroke-linecap="round"/>
+            <svg class="sw-receipt-icon" viewBox="0 0 52 64" width="48" height="60" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M 6 4 C 6 2 8 0 10 0 L 36 0 L 46 10 L 46 54 L 42 50 L 38 54 L 34 50 L 30 54 L 26 50 L 22 54 L 18 50 L 14 54 L 10 50 L 6 54 Z" fill="#e8eaed" stroke="#bdc1c6" stroke-width="2" stroke-linejoin="round"/>
+              <path d="M 36 0 L 36 10 L 46 10 Z" fill="#dadce0" stroke="#bdc1c6" stroke-width="2" stroke-linejoin="round"/>
+              <line x1="14" y1="18" x2="38" y2="18" stroke="#9aa0a6" stroke-width="2.5" stroke-linecap="round"/>
+              <line x1="14" y1="26" x2="38" y2="26" stroke="#9aa0a6" stroke-width="2.5" stroke-linecap="round"/>
+              <line x1="14" y1="34" x2="38" y2="34" stroke="#9aa0a6" stroke-width="2.5" stroke-linecap="round"/>
             </svg>
             <input type="hidden" id="expCategory" value="General">
           </div>
@@ -612,8 +607,8 @@
           Paid by
           <button type="button" class="sw-pill-dashed" id="btnTogglePayer">you</button>
           and split
-          <button type="button" class="sw-pill-dashed" id="btnToggleSplitType">equally</button>.
-          <span class="sw-split-calc-label" id="splitDetailSub">($0.00/person)</span>
+          <button type="button" class="sw-pill-dashed sw-pill-dashed-teal" id="btnToggleSplitType">equally</button>.
+          <div class="sw-split-detail-sub" id="splitDetailSub">($0.00/person)</div>
           <select id="expPayer" class="hidden"></select>
         </div>
 
@@ -629,23 +624,20 @@
           <div class="sw-participants-split-box" id="participantsSplitBox"></div>
         </div>
 
-        <!-- Action Meta Pills (Date, Notes, Group) -->
+        <!-- Action Meta Pills (Date, Notes, Group) - Clean text matching screenshot -->
         <div class="sw-meta-pills-row">
           <button type="button" class="sw-meta-pill" id="btnExpDatePill">
-            <span class="sw-pill-icon">📅</span>
             <span id="expDatePillText">November 25, 2026</span>
           </button>
           <input type="date" id="expDate" class="hidden">
 
           <button type="button" class="sw-meta-pill" id="btnExpNotesPill">
-            <span class="sw-pill-icon">📝</span>
             <span>Add image/notes</span>
           </button>
         </div>
 
-        <div class="sw-meta-pills-row" style="margin-top: -6px;">
+        <div class="sw-meta-pills-row sw-meta-pills-row-center">
           <button type="button" class="sw-meta-pill sw-meta-pill-group" id="btnExpGroupPill">
-            <span class="sw-pill-icon">👥</span>
             <span id="expGroupPillText">No group</span>
           </button>
         </div>

@@ -567,24 +567,23 @@ body {
 }
 
 .sw-ribbon-label {
-  font-size: 11px;
-  font-weight: 700;
+  font-size: 12px;
+  font-weight: 500;
   color: var(--sw-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  text-transform: none;
+  letter-spacing: normal;
   margin-bottom: 2px;
 }
 
 .sw-ribbon-val {
-  font-size: 18px;
-  font-weight: 800;
+  font-size: 20px;
+  font-weight: 700;
   color: var(--sw-text);
   line-height: 1.2;
 }
 
 .sw-ribbon-sub {
-  font-size: 11px;
-  color: var(--sw-text-light);
+  display: none !important;
 }
 
 /* ==========================================================================
@@ -1395,13 +1394,13 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background-color: #e8f7f3;
-  border: 1px solid #a3e4d4;
-  border-radius: 14px;
-  padding: 3px 8px;
-  font-size: 12px;
+  background-color: #ffffff;
+  border: 1px solid #cccccc;
+  border-radius: 16px;
+  padding: 3px 10px;
+  font-size: 13px;
   font-weight: 600;
-  color: #1a4f42;
+  color: #333333;
 }
 
 .sw-token-avatar {
@@ -1573,6 +1572,16 @@ body {
   color: var(--sw-teal);
 }
 
+.sw-pill-dashed-teal {
+  background-color: #dcf5ee !important;
+  border: 1px dashed var(--sw-teal) !important;
+  color: #1e705c !important;
+}
+
+.sw-pill-dashed-teal:hover {
+  background-color: #ccefe6 !important;
+}
+
 .sw-split-calc-label {
   font-size: 13px;
   color: #888888;
@@ -1594,24 +1603,30 @@ body {
   text-decoration: underline;
 }
 
-/* Meta Action Pills Row (Date, Notes, Group) */
+/* Meta Action Pills Row (Date, Notes, Group) - No emojis */
 .sw-meta-pills-row {
   display: flex;
   gap: 8px;
   align-items: center;
 }
 
+.sw-meta-pills-row-center {
+  justify-content: center;
+  margin-top: 6px;
+}
+
 .sw-meta-pill {
   background-color: #ffffff;
   border: 1px solid #d0d0d0;
   border-radius: 14px;
-  padding: 5px 12px;
+  padding: 6px 16px;
   font-family: inherit;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
-  color: #555555;
+  color: #444444;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -1623,7 +1638,9 @@ body {
 }
 
 .sw-meta-pill-group {
-  background-color: #f8faf9;
+  background-color: #ffffff;
+  padding: 6px 20px;
+}
   border-color: #c4e5dc;
   color: #1a4f42;
 }
