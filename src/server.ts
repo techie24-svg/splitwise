@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import path from 'node:path';
+import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { db } from './db/database.ts';
 import { calculateSplits, calculateEqualSplit } from './engine/splitCalculator.ts';
