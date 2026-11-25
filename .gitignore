@@ -12,3 +12,4 @@ targets/*
 !targets/.gitkeep
 extracted/*
 !extracted/.gitkeep
+analysis/rea-splitwise-web.json
